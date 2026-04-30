@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIDELA — Gestión Financiera Ganadera | Argentina</title>
+<meta name="description" content="VIDELA — Sistema de gestión financiera para empresas ganaderas en Argentina. Todo medido en kg carne con precios MAG semanales.">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tierra-oscura: #2a1a0e;
+    --tierra: #8b5a2b;
+    --tierra-bright: #c08552;
+    --gold: #d4a548;
+    --bone: #f0e8d8;
+    --bone-dark: #d8c8a8;
+    --texto: #2c2418;
+    --blanco: #ffffff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Manrope', sans-serif;
+    color: var(--texto);
+    background: var(--bone);
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--tierra-oscura);
+    padding: 16px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0; width: 100%;
+    z-index: 100;
+    border-bottom: 1px solid rgba(212,165,72,0.15);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--tierra) 0%, var(--gold) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Archivo Black', sans-serif;
+    color: var(--tierra-oscura);
+    font-size: 20px;
+    border-radius: 4px;
+    transform: rotate(-3deg);
+  }
+  .logo-text {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 1.4rem;
+    color: var(--bone);
+    letter-spacing: 0.16em;
+  }
+  .logo-text span {
+    display: block;
+    font-size: 9px;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    font-weight: 400;
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+
+  nav a {
+    color: var(--bone-dark);
+    text-decoration: none;
+    margin-left: 28px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
+    text-transform: uppercase;
+  }
+  nav a:hover { color: var(--gold); }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background:
+      radial-gradient(ellipse at 30% 30%, rgba(192,133,82,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 70%, rgba(212,165,72,0.12) 0%, transparent 60%),
+      linear-gradient(170deg, var(--tierra-oscura) 0%, #3a2818 50%, #4a3422 100%);
+    position: relative;
+    padding: 0 20px;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 100px, rgba(212,165,72,0.04) 100px, rgba(212,165,72,0.04) 101px),
+      repeating-linear-gradient(90deg, transparent, transparent 100px, rgba(212,165,72,0.04) 100px, rgba(212,165,72,0.04) 101px);
+    opacity: 0.7;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 760px;
+  }
+
+  .hero-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid rgba(212,165,72,0.3);
+    border-radius: 20px;
+    margin-bottom: 24px;
+    background: rgba(212,165,72,0.05);
+    animation: fadeInUp 0.8s ease;
+  }
+
+  .hero h1 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 6rem;
+    color: var(--bone);
+    margin-bottom: 16px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    animation: fadeInUp 1s ease 0.1s both;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .hero .sub {
+    font-size: 1.4rem;
+    color: var(--bone-dark);
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    margin-bottom: 14px;
+    animation: fadeInUp 1s ease 0.2s both;
+  }
+  .hero .sub strong { color: var(--gold); font-weight: 600; }
+
+  .hero p {
+    font-size: 1rem;
+    color: rgba(240,232,216,0.75);
+    line-height: 1.8;
+    font-weight: 300;
+    max-width: 560px;
+    margin: 0 auto 36px;
+    animation: fadeInUp 1s ease 0.3s both;
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: linear-gradient(135deg, var(--tierra) 0%, var(--gold) 100%);
+    color: var(--tierra-oscura);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    transition: all 0.3s;
+    animation: fadeInUp 1s ease 0.4s both;
+    box-shadow: 0 4px 20px rgba(212,165,72,0.3);
+  }
+  .hero-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(212,165,72,0.5);
+  }
+  .hero-cta::after {
+    content: '→';
+    font-size: 1.2rem;
+    transition: transform 0.2s;
+  }
+  .hero-cta:hover::after { transform: translateX(4px); }
+
+  /* SECCIÓN */
+  section { padding: 100px 40px; }
+
+  .section-tag {
+    display: block;
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--tierra-bright);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 2.8rem;
+    color: var(--tierra-oscura);
+    text-align: center;
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--tierra);
+    font-weight: 300;
+    font-size: 1.05rem;
+    max-width: 600px;
+    margin: 0 auto 64px;
+  }
+
+  /* DESTACADO MAG */
+  .mag-section {
+    background: var(--tierra-oscura);
+    color: var(--bone);
+    padding: 80px 40px;
+    text-align: center;
+  }
+  .mag-section .label {
+    font-size: 0.75rem;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .mag-section .big {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 4rem;
+    color: var(--bone);
+    line-height: 1.1;
+    margin-bottom: 20px;
+    letter-spacing: 0.04em;
+  }
+  .mag-section .big .arrow {
+    color: var(--gold);
+    margin: 0 16px;
+  }
+  .mag-section .desc {
+    max-width: 600px;
+    margin: 0 auto;
+    color: var(--bone-dark);
+    line-height: 1.8;
+    font-weight: 300;
+    font-size: 1rem;
+  }
+
+  /* SERVICIOS */
+  .servicios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .servicio-card {
+    background: var(--blanco);
+    padding: 36px 28px;
+    border-radius: 6px;
+    border-top: 3px solid var(--tierra);
+    box-shadow: 0 2px 16px rgba(42,26,14,0.06);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .servicio-card::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: radial-gradient(circle, rgba(212,165,72,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .servicio-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 36px rgba(42,26,14,0.12);
+    border-top-color: var(--gold);
+  }
+  .servicio-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--tierra-bright);
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .servicio-card h3 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 1.15rem;
+    color: var(--tierra-oscura);
+    margin-bottom: 14px;
+    letter-spacing: 0.04em;
+  }
+  .servicio-card p {
+    color: #5a4a3a;
+    font-size: 0.93rem;
+    line-height: 1.7;
+    font-weight: 300;
+  }
+
+  /* SOBRE */
+  .sobre {
+    background: var(--tierra-oscura);
+    color: var(--bone);
+    position: relative;
+    overflow: hidden;
+  }
+  .sobre::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 0% 0%, rgba(192,133,82,0.18) 0%, transparent 50%),
+      radial-gradient(ellipse at 100% 100%, rgba(212,165,72,0.12) 0%, transparent 50%);
+  }
+  .sobre .section-title { color: var(--bone); position: relative; }
+  .sobre .section-tag { color: var(--gold); position: relative; }
+  .sobre .section-sub { color: var(--bone-dark); position: relative; }
+
+  .sobre-content {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    position: relative;
+  }
+  .sobre-text p {
+    font-size: 1rem;
+    line-height: 1.9;
+    font-weight: 300;
+    color: rgba(240,232,216,0.85);
+    margin-bottom: 14px;
+  }
+  .sobre-datos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .dato {
+    text-align: center;
+    padding: 26px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(212,165,72,0.15);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+  }
+  .dato-numero {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 2.4rem;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .dato-label {
+    font-size: 0.75rem;
+    color: rgba(240,232,216,0.55);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* CONTACTO */
+  .contacto-info {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .contacto-info p {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--tierra);
+    font-weight: 300;
+    margin-bottom: 32px;
+  }
+  .contacto-datos {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+  }
+  .contacto-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: var(--tierra-oscura);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .contacto-item .ic {
+    font-size: 1.2rem;
+    color: var(--tierra-bright);
+  }
+
+  /* FOOTER */
+  footer {
+    background: var(--tierra-oscura);
+    color: rgba(240,232,216,0.5);
+    text-align: center;
+    padding: 32px;
+    font-size: 0.85rem;
+    font-weight: 300;
+    border-top: 1px solid rgba(212,165,72,0.15);
+  }
+  footer strong {
+    color: var(--gold);
+    font-weight: 600;
+    font-family: 'Archivo Black', sans-serif;
+    letter-spacing: 0.1em;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 768px) {
+    header { padding: 12px 20px; }
+    .logo-text { font-size: 1.1rem; }
+    nav { display: none; }
+    .hero h1 { font-size: 3.6rem; letter-spacing: 0.04em; }
+    .hero .sub { font-size: 1.1rem; }
+    section { padding: 64px 20px; }
+    .section-title { font-size: 2rem; }
+    .mag-section .big { font-size: 2.4rem; }
+    .mag-section .big .arrow { display: block; margin: 8px 0; }
+    .sobre-content { grid-template-columns: 1fr; gap: 40px; }
+    .contacto-datos { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">V</div>
+    <div class="logo-text">VIDELA<span>Gestión Ganadera AR</span></div>
+  </div>
+  <nav>
+    <a href="#servicios">Servicios</a>
+    <a href="#sobre">Nosotros</a>
+    <a href="#contacto">Contacto</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-content">
+    <span class="hero-tag">★ Sistema medido en kg carne</span>
+    <h1>VIDELA</h1>
+    <div class="sub">Gestión Financiera Ganadera <strong>Argentina</strong></div>
+    <p>Control financiero pensado para el campo argentino. Cada gasto, cada ingreso y cada deuda medidos en kg de carne usando el promedio semanal del Mercado Agroganadero (MAG).</p>
+    <a href="#servicios" class="hero-cta">Ver servicios</a>
+  </div>
+</section>
+
+<section class="mag-section">
+  <div class="label">Unidad de medida real</div>
+  <div class="big">$ ARS <span class="arrow">→</span> kg CARNE</div>
+  <p class="desc">El Índice Novillo MAG se actualiza automáticamente cada lunes mediante scraping. Cada movimiento que cargás se convierte al precio promedio de la semana anterior, dando una medida real del valor — inmune a la inflación.</p>
+</section>
+
+<section id="servicios">
+  <span class="section-tag">001 · Soluciones</span>
+  <h2 class="section-title">Nuestros Servicios</h2>
+  <p class="section-sub">Herramientas pensadas para la realidad económica argentina y la operativa de campo</p>
+  <div class="servicios-grid">
+    <div class="servicio-card">
+      <div class="servicio-num">/01</div>
+      <h3>Conversión kg carne</h3>
+      <p>Cada gasto y cobro se guarda en pesos y se calcula automáticamente en kg carne usando el promedio MAG de la semana anterior. Tu balance no lo borra la inflación.</p>
+    </div>
+    <div class="servicio-card">
+      <div class="servicio-num">/02</div>
+      <h3>Scraping MAG automático</h3>
+      <p>Cada lunes el sistema baja del Mercado Agroganadero los precios de la semana cerrada y promedia el Índice Novillo ponderado por cabezas faenadas.</p>
+    </div>
+    <div class="servicio-card">
+      <div class="servicio-num">/03</div>
+      <h3>Cuentas Corrientes</h3>
+      <p>Saldo dual ARS/kg carne con proveedores. Sabés exactamente cuánta carne le debés a cada uno aunque pasen meses entre facturación y pago.</p>
+    </div>
+    <div class="servicio-card">
+      <div class="servicio-num">/04</div>
+      <h3>Cheques e Inversores</h3>
+      <p>Cheques emitidos y recibidos con valor en kg al día de emisión. Inversores con capital en kg carne y tasa de interés indexada — sin sorpresas inflacionarias.</p>
+    </div>
+    <div class="servicio-card">
+      <div class="servicio-num">/05</div>
+      <h3>Asistente WhatsApp</h3>
+      <p>Cargá movimientos hablando normal: "nafta 45000", "pago peón 200000". El bot interpreta, categoriza y convierte a kg carne en el momento.</p>
+    </div>
+    <div class="servicio-card">
+      <div class="servicio-num">/06</div>
+      <h3>Presupuestos en kg</h3>
+      <p>Presupuestos anuales por categoría definidos en kg carne (no en pesos). Año tras año la comparación es justa, sin distorsionarse por inflación.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sobre" id="sobre">
+  <span class="section-tag">002 · Sobre VIDELA</span>
+  <h2 class="section-title">Tecnología argentina para el campo</h2>
+  <p class="section-sub">Construido para resolver el problema real de medir bien en una economía con alta inflación</p>
+  <div class="sobre-content">
+    <div class="sobre-text">
+      <p>VIDELA nace de una necesidad concreta: en Argentina, comparar gastos en pesos entre meses pierde sentido por la inflación. La carne, en cambio, es una unidad de valor estable que el productor entiende intuitivamente.</p>
+      <p>El sistema usa el Índice Novillo MAG de Cañuelas como referencia oficial — la misma referencia que usan los contratos de arrendamiento rural en todo el país. Así, lo que se mide se compara correctamente.</p>
+      <p>Operamos desde Argentina, adaptado a la operativa diaria de la empresa ganadera moderna: WhatsApp como interfaz principal, dashboard web para análisis, todo en tiempo real.</p>
+    </div>
+    <div class="sobre-datos">
+      <div class="dato"><div class="dato-numero">MAG</div><div class="dato-label">Índice oficial</div></div>
+      <div class="dato"><div class="dato-numero">kg</div><div class="dato-label">Unidad real</div></div>
+      <div class="dato"><div class="dato-numero">24/7</div><div class="dato-label">Disponible</div></div>
+      <div class="dato"><div class="dato-numero">AR</div><div class="dato-label">Argentina</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="contacto">
+  <span class="section-tag">003 · Contacto</span>
+  <h2 class="section-title">Hablemos</h2>
+  <p class="section-sub">Estamos para ayudarte a poner orden financiero en tu campo</p>
+  <div class="contacto-info">
+    <p>Si querés implementar VIDELA en tu empresa ganadera o tenés consultas sobre el sistema, contactanos.</p>
+    <div class="contacto-datos">
+      <div class="contacto-item"><span class="ic">▸</span> Argentina</div>
+      <div class="contacto-item"><span class="ic">▸</span> +54 9 11 0000-0000</div>
+      <div class="contacto-item"><span class="ic">▸</span> contacto@videla.ar</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>&copy; 2026 <strong>VIDELA</strong> — Gestión Financiera Ganadera · Argentina</p>
+</footer>
+
+</body>
+</html>

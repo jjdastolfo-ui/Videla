@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIDELA — Sistema Financiero Ganadero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    /* Paleta tierra argentina + acentos */
+    --bg: #1a1410;
+    --surface: #221a14;
+    --surface2: #2a201a;
+    --surface3: #342820;
+    --border: #3a2c22;
+    --border-bright: #4a3828;
+
+    --tierra: #8b5a2b;
+    --tierra-bright: #c08552;
+    --tierra-dim: rgba(139,90,43,0.18);
+    --tierra-glow: rgba(192,133,82,0.28);
+
+    --celeste: #4a90b8;
+    --celeste-bright: #6bb0d8;
+    --celeste-dim: rgba(74,144,184,0.18);
+
+    --bone: #e8dcc8;
+    --bone-dim: rgba(232,220,200,0.65);
+
+    --gold: #d4a548;
+    --gold-bright: #f0c060;
+
+    --red: #b8362a;
+    --red-bright: #d65040;
+    --red-dim: rgba(184,54,42,0.15);
+
+    --green: #4a8b3a;
+    --green-bright: #6ab055;
+    --green-dim: rgba(74,139,58,0.18);
+
+    --text: #f0e8d8;
+    --muted: #8a7a68;
+    --muted2: #5a4a3a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #14100c;
+    color: var(--text);
+    font-family: 'Manrope', sans-serif;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 280px 1fr 340px;
+    grid-template-rows: 56px 1fr;
+    overflow: hidden;
+    background-image:
+      radial-gradient(ellipse at 0% 0%, rgba(139,90,43,0.18) 0%, transparent 45%),
+      radial-gradient(ellipse at 100% 0%, rgba(74,144,184,0.12) 0%, transparent 45%),
+      radial-gradient(ellipse at 100% 100%, rgba(212,165,72,0.10) 0%, transparent 50%),
+      repeating-linear-gradient(0deg, transparent, transparent 80px, rgba(58,44,34,0.08) 80px, rgba(58,44,34,0.08) 81px),
+      repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(58,44,34,0.08) 80px, rgba(58,44,34,0.08) 81px);
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(34,26,20,0.95);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    backdrop-filter: blur(10px);
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--tierra-bright) 0%, var(--gold) 50%, var(--celeste) 100%);
+    opacity: 0.6;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .brand-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--tierra) 0%, var(--gold) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Archivo Black', sans-serif;
+    color: var(--bg);
+    font-size: 18px;
+    border-radius: 4px;
+    transform: rotate(-3deg);
+    box-shadow: 0 2px 8px rgba(212,165,72,0.3);
+  }
+  .brand-name {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.16em;
+    color: var(--bone);
+  }
+  .brand-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-center { display: flex; align-items: center; gap: 14px; }
+  .header-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-pill.mag {
+    background: linear-gradient(135deg, var(--tierra-dim) 0%, var(--surface2) 100%);
+    border-color: var(--tierra);
+    color: var(--bone);
+  }
+  .header-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green-bright);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .header-pill .val { color: var(--bone); font-weight: 600; }
+  .header-pill .lbl { color: var(--muted); }
+
+  .header-actions { display: flex; gap: 8px; }
+  .hbtn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .hbtn:hover { border-color: var(--tierra-bright); color: var(--tierra-bright); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: rgba(34,26,20,0.92);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 16px 0;
+    backdrop-filter: blur(8px);
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+
+  .sidebar-section { padding: 0 16px; margin-bottom: 20px; }
+  .sidebar-label {
+    font-size: 9px;
+    color: var(--muted2);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 10px;
+    padding-left: 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: var(--tierra-dim);
+    border-color: var(--tierra);
+    color: var(--tierra-bright);
+  }
+  .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+
+  /* KPI cards */
+  .kpi-card {
+    background: rgba(42,32,26,0.92);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--tierra-bright);
+    border-radius: 3px 0 0 3px;
+  }
+  .kpi-card.green::before { background: var(--green-bright); }
+  .kpi-card.gold::before { background: var(--gold); }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-card.celeste::before { background: var(--celeste); }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 17px; color: var(--bone); font-weight: 600; }
+  .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── MAIN ── */
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    padding: 10px 20px 0;
+    background: rgba(34,26,20,0.9);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    backdrop-filter: blur(8px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab {
+    font-size: 12px;
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .tab:hover { color: var(--text); background: var(--surface2); }
+  .tab.active {
+    background: var(--bg);
+    color: var(--tierra-bright);
+    border-color: var(--border-bright);
+    border-bottom-color: var(--bg);
+    margin-bottom: -1px;
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) transparent;
+  }
+  .content::-webkit-scrollbar { width: 8px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; }
+
+  .panel-title {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 13px;
+    color: var(--bone);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title .accent { color: var(--gold); font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .kpi-big {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-big::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 100% 0%, var(--tierra-dim) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .kpi-big.celeste::after { background: radial-gradient(circle at 100% 0%, var(--celeste-dim) 0%, transparent 60%); }
+  .kpi-big.green::after { background: radial-gradient(circle at 100% 0%, var(--green-dim) 0%, transparent 60%); }
+  .kpi-big.red::after { background: radial-gradient(circle at 100% 0%, var(--red-dim) 0%, transparent 60%); }
+  .kpi-big-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .kpi-big-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    color: var(--bone);
+    font-weight: 600;
+    line-height: 1.1;
+    position: relative;
+  }
+  .kpi-big-value .unit {
+    font-size: 13px;
+    color: var(--muted);
+    margin-left: 4px;
+    font-weight: 400;
+  }
+  .kpi-big-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+  }
+
+  /* Tablas */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: var(--surface);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  thead {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border-bright);
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+  th.right, td.right { text-align: right; }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(139,90,43,0.06); }
+  td.mono, td .mono { font-family: 'JetBrains Mono', monospace; }
+  td.kg { color: var(--gold); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  td.ars { color: var(--bone-dim); font-family: 'JetBrains Mono', monospace; }
+  td.cat { color: var(--celeste-bright); font-size: 11px; }
+  td.neg { color: var(--red-bright); }
+  td.pos { color: var(--green-bright); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .badge.pendiente { background: var(--red-dim); color: var(--red-bright); border: 1px solid rgba(184,54,42,0.3); }
+  .badge.cobrado { background: var(--green-dim); color: var(--green-bright); border: 1px solid rgba(74,139,58,0.3); }
+
+  /* ── CHAT (RIGHT) ── */
+  .chat-panel {
+    background: rgba(34,26,20,0.95);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+  .chat-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-header .avatar {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--tierra) 0%, var(--gold) 100%);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Archivo Black', sans-serif;
+    color: var(--bg);
+    font-size: 14px;
+  }
+  .chat-header .info { flex: 1; }
+  .chat-header .name {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 13px;
+    color: var(--bone);
+    letter-spacing: 0.08em;
+  }
+  .chat-header .status {
+    font-size: 10px;
+    color: var(--green-bright);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .chat-header .status::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--green-bright);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) transparent;
+  }
+  .chat-messages::-webkit-scrollbar { width: 6px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+  .msg {
+    max-width: 85%;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    animation: msgIn 0.2s ease;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--tierra);
+    color: var(--bg);
+    border-bottom-right-radius: 4px;
+    font-weight: 500;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: var(--surface3);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.bot strong { color: var(--gold); }
+
+  .chat-input-wrap {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .chat-input-form {
+    display: flex;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 4px 4px 4px 14px;
+    transition: border-color 0.15s;
+  }
+  .chat-input-form:focus-within { border-color: var(--tierra-bright); }
+  .chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Manrope', sans-serif;
+    padding: 8px 0;
+  }
+  .chat-input::placeholder { color: var(--muted); }
+  .send-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--tierra) 0%, var(--gold) 100%);
+    border: none;
+    color: var(--bg);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s;
+  }
+  .send-btn:hover { transform: scale(1.08); }
+  .send-btn:disabled { opacity: 0.5; cursor: wait; }
+
+  .chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .suggest {
+    font-size: 10px;
+    padding: 4px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+  }
+  .suggest:hover { border-color: var(--tierra-bright); color: var(--tierra-bright); }
+
+  /* Estado MAG destacado en panel */
+  .mag-card {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface3) 100%);
+    border: 1px solid var(--tierra);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mag-card::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, var(--tierra-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .mag-label {
+    font-size: 10px;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 6px;
+  }
+  .mag-value {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 36px;
+    color: var(--bone);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .mag-value .ars { color: var(--gold); font-size: 20px; margin-right: 4px; }
+  .mag-value .unit { font-size: 14px; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+  .mag-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .mag-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+  /* Form inputs */
+  input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Manrope', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--tierra-bright); }
+
+  .btn {
+    background: var(--tierra);
+    border: none;
+    color: var(--bg);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--tierra-bright); transform: translateY(-1px); }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn.ghost:hover { border-color: var(--tierra-bright); color: var(--tierra-bright); transform: none; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-state .text { font-size: 13px; }
+
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+    height: 280px;
+  }
+
+  /* Mobile */
+  @media (max-width: 1024px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 56px auto 1fr; }
+    .sidebar { display: none; }
+    .chat-panel { display: none; }
+    body.show-chat { grid-template-columns: 1fr; }
+    body.show-chat .main { display: none; }
+    body.show-chat .chat-panel { display: flex; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">V</div>
+    <div>
+      <div class="brand-name">VIDELA</div>
+      <div class="brand-sub">Gestión Ganadera · AR</div>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <div class="header-pill mag" id="magHeader">
+      <span class="dot"></span>
+      <span class="lbl">MAG</span>
+      <span class="val" id="magHeaderVal">cargando...</span>
+    </div>
+    <div class="header-pill">
+      <span class="lbl">Ciclo</span>
+      <span class="val" id="cicloHeaderVal">—</span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button class="hbtn" onclick="refrescarMag()">↻ MAG</button>
+    <button class="hbtn" onclick="cargarTodo()">↻ Datos</button>
+  </div>
+</header>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">Indicadores</div>
+    <div class="kpi-card gold">
+      <div class="kpi-label">Egresos del mes</div>
+      <div class="kpi-value" id="kpiEgresoKg">— kg</div>
+      <div class="kpi-sub" id="kpiEgresoArs">$ —</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Ingresos del mes</div>
+      <div class="kpi-value" id="kpiIngresoKg">— kg</div>
+      <div class="kpi-sub" id="kpiIngresoArs">$ —</div>
+    </div>
+    <div class="kpi-card celeste">
+      <div class="kpi-label">Cheques pendientes</div>
+      <div class="kpi-value" id="kpiCheques">— ($ —)</div>
+      <div class="kpi-sub" id="kpiChequesKg">— kg</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Deuda inversores</div>
+      <div class="kpi-value" id="kpiInversores">— kg</div>
+      <div class="kpi-sub">Capital + intereses</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Navegación</div>
+    <div class="nav-item active" onclick="setTab('dashboard')"><span class="icon">⌗</span> Dashboard</div>
+    <div class="nav-item" onclick="setTab('movimientos')"><span class="icon">↹</span> Movimientos</div>
+    <div class="nav-item" onclick="setTab('cuentas')"><span class="icon">⇄</span> Cuentas Cte.</div>
+    <div class="nav-item" onclick="setTab('cheques')"><span class="icon">▢</span> Cheques</div>
+    <div class="nav-item" onclick="setTab('inversores')"><span class="icon">◉</span> Inversores</div>
+    <div class="nav-item" onclick="setTab('presupuestos')"><span class="icon">▦</span> Presupuestos</div>
+    <div class="nav-item" onclick="setTab('mag')"><span class="icon">$</span> Histórico MAG</div>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+  <div class="tab-bar" id="tabBar">
+    <div class="tab active" data-tab="dashboard">Dashboard</div>
+    <div class="tab" data-tab="movimientos">Movimientos</div>
+    <div class="tab" data-tab="cuentas">Cuentas Cte.</div>
+    <div class="tab" data-tab="cheques">Cheques</div>
+    <div class="tab" data-tab="inversores">Inversores</div>
+    <div class="tab" data-tab="presupuestos">Presupuestos</div>
+    <div class="tab" data-tab="mag">MAG</div>
+  </div>
+
+  <div class="content" id="content"></div>
+</main>
+
+<!-- ── CHAT (Claude) ── -->
+<aside class="chat-panel">
+  <div class="chat-header">
+    <div class="avatar">V</div>
+    <div class="info">
+      <div class="name">VIDELA BOT</div>
+      <div class="status">Activo · IA conectada</div>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg bot">¡Hola! Soy <strong>VIDELA</strong>. Cargá movimientos, consultá saldos o pedí informes. Todo en pesos, todo medido en kg carne (MAG).
+
+Probá: <em>"nafta 50000"</em> o <em>"resumen del mes"</em>.</div>
+  </div>
+  <div class="chat-input-wrap">
+    <form class="chat-input-form" id="chatForm">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Escribí un mensaje..." autocomplete="off">
+      <button type="submit" class="send-btn" id="sendBtn">→</button>
+    </form>
+    <div class="chat-suggestions">
+      <span class="suggest" onclick="enviarSug('precio MAG actual')">precio MAG</span>
+      <span class="suggest" onclick="enviarSug('resumen del mes')">resumen mes</span>
+      <span class="suggest" onclick="enviarSug('ver cuentas corrientes')">cuentas</span>
+      <span class="suggest" onclick="enviarSug('ver cheques pendientes')">cheques</span>
+    </div>
+  </div>
+</aside>
+
+<script>
+const API = (window.location.hostname === "localhost" || window.location.hostname.startsWith("127."))
+  ? "http://localhost:3000"
+  : window.location.origin;
+
+let estado = {
+  tab: "dashboard",
+  resumen: null,
+  mag: null,
+  transacciones: [],
+  cuentas: [],
+  cheques: [],
+  inversores: [],
+  presupuestos: { ciclo: null, presupuestos: [] }
+};
+
+function fmtArs(n) {
+  return parseFloat(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmtKg(n) {
+  return parseFloat(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+function fmtFecha(s) {
+  if (!s) return "—";
+  const [y, m, d] = s.split("-");
+  return d + "/" + m + "/" + y.slice(2);
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+async function fetchJson(path) {
+  try {
+    const r = await fetch(API + path);
+    return await r.json();
+  } catch (e) {
+    console.error("API error:", path, e);
+    return null;
+  }
+}
+
+async function cargarTodo() {
+  const [resumen, mag, tx, cu, ch, inv, pre] = await Promise.all([
+    fetchJson("/api/resumen"),
+    fetchJson("/api/mag"),
+    fetchJson("/api/transacciones?limite=50"),
+    fetchJson("/api/cuentas"),
+    fetchJson("/api/cheques"),
+    fetchJson("/api/inversores"),
+    fetchJson("/api/presupuestos")
+  ]);
+  estado.resumen = resumen;
+  estado.mag = mag;
+  estado.transacciones = tx || [];
+  estado.cuentas = cu || [];
+  estado.cheques = ch || [];
+  estado.inversores = inv || [];
+  estado.presupuestos = pre || { ciclo: null, presupuestos: [] };
+
+  pintarHeader();
+  pintarSidebar();
+  render();
+}
+
+function pintarHeader() {
+  if (estado.mag?.actual) {
+    document.getElementById("magHeaderVal").textContent = "$" + fmtArs(estado.mag.actual.precio) + "/kg";
+  } else {
+    document.getElementById("magHeaderVal").textContent = "—";
+  }
+  if (estado.presupuestos?.ciclo) {
+    document.getElementById("cicloHeaderVal").textContent = estado.presupuestos.ciclo;
+  }
+}
+
+function pintarSidebar() {
+  const r = estado.resumen || {};
+  document.getElementById("kpiEgresoKg").innerHTML = fmtKg(r.egresos_mes_kg) + ' <span style="color:var(--muted);font-size:12px">kg</span>';
+  document.getElementById("kpiEgresoArs").textContent = "$ " + fmtArs(r.egresos_mes_ars);
+  document.getElementById("kpiIngresoKg").innerHTML = fmtKg(r.ingresos_mes_kg) + ' <span style="color:var(--muted);font-size:12px">kg</span>';
+  document.getElementById("kpiIngresoArs").textContent = "$ " + fmtArs(r.ingresos_mes_ars);
+  document.getElementById("kpiCheques").textContent = (r.cheques_pendientes || 0) + " ($" + fmtArs(r.monto_cheques_ars) + ")";
+  document.getElementById("kpiChequesKg").textContent = fmtKg(r.monto_cheques_kg) + " kg";
+  document.getElementById("kpiInversores").innerHTML = fmtKg(r.deuda_inversores_kg) + ' <span style="color:var(--muted);font-size:12px">kg</span>';
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  estado.tab = tab;
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+  document.querySelectorAll(".nav-item").forEach(n => {
+    const onclick = n.getAttribute("onclick") || "";
+    n.classList.toggle("active", onclick.includes("'" + tab + "'"));
+  });
+  render();
+}
+
+document.getElementById("tabBar").addEventListener("click", e => {
+  if (e.target.classList.contains("tab")) setTab(e.target.dataset.tab);
+});
+
+// ── Render por tab ────────────────────────────────────────────────────────
+function render() {
+  const c = document.getElementById("content");
+  switch (estado.tab) {
+    case "dashboard": c.innerHTML = renderDashboard(); break;
+    case "movimientos": c.innerHTML = renderMovimientos(); break;
+    case "cuentas": c.innerHTML = renderCuentas(); break;
+    case "cheques": c.innerHTML = renderCheques(); break;
+    case "inversores": c.innerHTML = renderInversores(); break;
+    case "presupuestos": c.innerHTML = renderPresupuestos(); break;
+    case "mag": c.innerHTML = renderMag(); break;
+  }
+  // Charts post-render
+  if (estado.tab === "dashboard") setTimeout(dibujarChartDashboard, 50);
+  if (estado.tab === "mag") setTimeout(dibujarChartMag, 50);
+}
+
+function renderDashboard() {
+  const r = estado.resumen || {};
+  const m = estado.mag?.actual;
+  const ult = estado.transacciones.slice(0, 8);
+
+  const magHtml = m ? `
+    <div class="mag-card">
+      <div class="mag-label">Índice Novillo MAG · Semana ${m.semana || "—"}</div>
+      <div class="mag-value"><span class="ars">$</span>${fmtArs(m.precio)} <span class="unit">/kg</span></div>
+      <div class="mag-sub">Promedio ponderado · ${m.cabezas ? m.cabezas.toLocaleString("es-AR") + " cabezas" : "sin datos cabezas"}${m.fallback ? " · ⚠️ último disponible" : ""}</div>
+      <div class="mag-actions">
+        <button class="btn ghost" onclick="refrescarMag()">↻ Refrescar scraping</button>
+        <button class="btn ghost" onclick="setTab('mag')">Histórico →</button>
+      </div>
+    </div>
+  ` : `<div class="mag-card"><div class="mag-label">MAG</div><div class="mag-value" style="font-size:18px">Sin datos. <button class="btn" onclick="refrescarMag()">Cargar</button></div></div>`;
+
+  return `
+    ${magHtml}
+
+    <div class="kpi-grid">
+      <div class="kpi-big">
+        <div class="kpi-big-label">Egresos del mes</div>
+        <div class="kpi-big-value">${fmtKg(r.egresos_mes_kg)} <span class="unit">kg</span></div>
+        <div class="kpi-big-sub">$ ${fmtArs(r.egresos_mes_ars)} ARS</div>
+      </div>
+      <div class="kpi-big green">
+        <div class="kpi-big-label">Ingresos del mes</div>
+        <div class="kpi-big-value">${fmtKg(r.ingresos_mes_kg)} <span class="unit">kg</span></div>
+        <div class="kpi-big-sub">$ ${fmtArs(r.ingresos_mes_ars)} ARS</div>
+      </div>
+      <div class="kpi-big celeste">
+        <div class="kpi-big-label">Resultado del mes</div>
+        <div class="kpi-big-value" style="color: ${(r.ingresos_mes_kg - r.egresos_mes_kg) >= 0 ? "var(--green-bright)" : "var(--red-bright)"}">
+          ${fmtKg((r.ingresos_mes_kg || 0) - (r.egresos_mes_kg || 0))} <span class="unit">kg</span>
+        </div>
+        <div class="kpi-big-sub">${r.total_movimientos || 0} movimientos totales</div>
+      </div>
+      <div class="kpi-big red">
+        <div class="kpi-big-label">Deuda total inversores</div>
+        <div class="kpi-big-value">${fmtKg(r.deuda_inversores_kg)} <span class="unit">kg</span></div>
+        <div class="kpi-big-sub">Indexada a kg carne</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap"><canvas id="chartCategorias"></canvas></div>
+
+    <div class="panel-title">Últimos movimientos <span class="accent">${ult.length}</span></div>
+    ${tablaTransacciones(ult)}
+  `;
+}
+
+function tablaTransacciones(rows) {
+  if (!rows.length) return `<div class="empty-state"><div class="icon">∅</div><div class="text">Sin movimientos todavía. Cargá uno desde el chat.</div></div>`;
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Categoría</th>
+          <th>Detalle</th>
+          <th>Proveedor</th>
+          <th class="right">ARS</th>
+          <th class="right">Kg carne</th>
+          <th class="right">MAG</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(t => {
+          const esEgreso = t.egreso_ars > 0;
+          const ars = esEgreso ? -t.egreso_ars : t.ingreso_ars;
+          const kg = esEgreso ? -t.egreso_kg : t.ingreso_kg;
+          return `
+            <tr>
+              <td class="mono">${fmtFecha(t.fecha)}</td>
+              <td class="cat">${t.concepto}</td>
+              <td>${t.detalle || "—"}</td>
+              <td>${t.proveedor || "—"}</td>
+              <td class="right ars ${ars < 0 ? "neg" : "pos"}">${ars < 0 ? "-" : "+"}$${fmtArs(Math.abs(ars))}</td>
+              <td class="right kg ${kg < 0 ? "neg" : "pos"}">${kg < 0 ? "-" : "+"}${fmtKg(Math.abs(kg))}</td>
+              <td class="right mono" style="color:var(--muted);font-size:11px">${t.precio_mag ? "$" + fmtArs(t.precio_mag) : "—"}</td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderMovimientos() {
+  return `
+    <div class="panel-title">Todos los movimientos <span class="accent">${estado.transacciones.length}</span></div>
+    ${tablaTransacciones(estado.transacciones)}
+  `;
+}
+
+function renderCuentas() {
+  const conSaldo = estado.cuentas.filter(c => c.saldo_ars !== 0 || c.saldo_kg !== 0);
+  if (!conSaldo.length) return `<div class="panel-title">Cuentas Corrientes</div><div class="empty-state"><div class="icon">∅</div><div class="text">Ninguna cuenta con saldo pendiente.</div></div>`;
+
+  const totalKg = conSaldo.reduce((s, c) => s + (c.saldo_kg || 0), 0);
+  const totalArs = conSaldo.reduce((s, c) => s + (c.saldo_ars || 0), 0);
+
+  return `
+    <div class="panel-title">Cuentas Corrientes <span class="accent">total: ${fmtKg(totalKg)} kg · $${fmtArs(totalArs)}</span></div>
+    <table>
+      <thead><tr>
+        <th>Proveedor</th><th>Notas</th>
+        <th class="right">Saldo ARS</th><th class="right">Saldo kg</th><th class="right">Estado</th>
+      </tr></thead>
+      <tbody>
+        ${conSaldo.map(c => `
+          <tr>
+            <td><strong>${c.proveedor}</strong></td>
+            <td style="color:var(--muted);font-size:11px">${c.notas || "—"}</td>
+            <td class="right ars ${c.saldo_ars > 0 ? "neg" : "pos"}">$${fmtArs(Math.abs(c.saldo_ars))}</td>
+            <td class="right kg ${c.saldo_kg > 0 ? "neg" : "pos"}">${fmtKg(Math.abs(c.saldo_kg))}</td>
+            <td class="right"><span class="badge ${c.saldo_ars > 0 ? "pendiente" : "cobrado"}">${c.saldo_ars > 0 ? "Debemos" : "A favor"}</span></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderCheques() {
+  const ch = estado.cheques;
+  if (!ch.length) return `<div class="panel-title">Cheques</div><div class="empty-state"><div class="icon">∅</div><div class="text">No hay cheques cargados.</div></div>`;
+  return `
+    <div class="panel-title">Cheques <span class="accent">${ch.length} totales</span></div>
+    <table>
+      <thead><tr>
+        <th>ID</th><th>Tipo</th><th>Proveedor</th>
+        <th>Emisión</th><th>Cobro</th>
+        <th class="right">ARS</th><th class="right">kg</th><th>Estado</th>
+      </tr></thead>
+      <tbody>
+        ${ch.map(c => `
+          <tr>
+            <td class="mono" style="color:var(--muted)">#${c.id}</td>
+            <td><span class="badge ${c.tipo === "EMITIDO" ? "pendiente" : "cobrado"}">${c.tipo}</span></td>
+            <td>${c.proveedor || "—"}</td>
+            <td class="mono">${fmtFecha(c.fecha_emision)}</td>
+            <td class="mono">${fmtFecha(c.fecha_cobro)}</td>
+            <td class="right ars">$${fmtArs(c.monto_ars)}</td>
+            <td class="right kg">${fmtKg(c.monto_kg)}</td>
+            <td><span class="badge ${c.estado === "PENDIENTE" ? "pendiente" : "cobrado"}">${c.estado}</span></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderInversores() {
+  const inv = estado.inversores;
+  if (!inv.length) return `<div class="panel-title">Inversores</div><div class="empty-state"><div class="icon">∅</div><div class="text">Sin inversores cargados.</div></div>`;
+  const totalKg = inv.reduce((s, i) => s + (i.deuda_calculada_kg || 0), 0);
+  return `
+    <div class="panel-title">Inversores <span class="accent">deuda total: ${fmtKg(totalKg)} kg carne</span></div>
+    <table>
+      <thead><tr>
+        <th>Inversor</th><th>Ingreso</th>
+        <th class="right">Capital ARS</th><th class="right">Capital kg</th>
+        <th class="right">Tasa</th><th class="right">Deuda actual (kg)</th><th>Estado</th>
+      </tr></thead>
+      <tbody>
+        ${inv.map(i => `
+          <tr>
+            <td><strong>${i.inversor}</strong></td>
+            <td class="mono">${fmtFecha(i.fecha_ingreso)}</td>
+            <td class="right ars">$${fmtArs(i.capital_ars)}</td>
+            <td class="right kg">${fmtKg(i.capital_kg)}</td>
+            <td class="right mono">${(i.tasa * 100).toFixed(1)}%</td>
+            <td class="right kg" style="font-size:14px">${fmtKg(i.deuda_calculada_kg)}</td>
+            <td><span class="badge ${i.estado === "ACTIVO" ? "pendiente" : "cobrado"}">${i.estado}</span></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderPresupuestos() {
+  const pres = estado.presupuestos.presupuestos || [];
+  if (!pres.length) return `<div class="panel-title">Presupuestos</div><div class="empty-state"><div class="icon">∅</div><div class="text">Sin presupuestos definidos. Decile al bot: <em>"presupuesto combustible 2000 kg"</em></div></div>`;
+  return `
+    <div class="panel-title">Presupuestos · Ciclo ${estado.presupuestos.ciclo}</div>
+    <table>
+      <thead><tr>
+        <th>Categoría</th><th class="right">Presup. anual (kg)</th>
+        <th class="right">Gastado (kg)</th><th class="right">%</th><th>Avance</th>
+      </tr></thead>
+      <tbody>
+        ${pres.map(p => {
+          const pct = Math.min(p.porcentaje, 200);
+          const color = p.porcentaje > 100 ? "var(--red-bright)" : (p.porcentaje > 80 ? "var(--gold)" : "var(--green-bright)");
+          return `
+            <tr>
+              <td class="cat"><strong>${p.concepto}</strong></td>
+              <td class="right kg">${fmtKg(p.monto_kg_anual)}</td>
+              <td class="right kg" style="color:${color}">${fmtKg(p.gastado_kg)}</td>
+              <td class="right mono" style="color:${color}">${p.porcentaje.toFixed(0)}%</td>
+              <td>
+                <div style="background:var(--surface3);height:8px;border-radius:4px;overflow:hidden;width:160px">
+                  <div style="background:${color};height:100%;width:${Math.min(pct, 100)}%;transition:width 0.3s"></div>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderMag() {
+  const h = estado.mag?.historial || [];
+  if (!h.length) return `<div class="panel-title">Histórico MAG</div><div class="empty-state"><div class="icon">∅</div><div class="text">Sin datos MAG. <button class="btn" onclick="refrescarMag()">Cargar ahora</button></div></div>`;
+  return `
+    <div class="panel-title">Histórico Índice Novillo MAG <span class="accent">${h.length} semanas</span></div>
+    <div class="chart-wrap" style="height:240px"><canvas id="chartMag"></canvas></div>
+    <table>
+      <thead><tr>
+        <th>Semana</th><th>Desde</th><th>Hasta</th>
+        <th class="right">$/kg</th><th class="right">Cabezas</th><th>Fuente</th>
+      </tr></thead>
+      <tbody>
+        ${h.map(p => `
+          <tr>
+            <td class="mono"><strong>${p.semana}</strong></td>
+            <td class="mono">${fmtFecha(p.fecha_desde)}</td>
+            <td class="mono">${fmtFecha(p.fecha_hasta)}</td>
+            <td class="right kg">$${fmtArs(p.precio_promedio)}</td>
+            <td class="right mono">${(p.cabezas || 0).toLocaleString("es-AR")}</td>
+            <td style="font-size:11px;color:var(--muted)">${p.fuente}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────
+function dibujarChartDashboard() {
+  const ctx = document.getElementById("chartCategorias");
+  if (!ctx) return;
+  const tx = estado.transacciones;
+  if (!tx.length) return;
+  const mesActual = new Date().toISOString().slice(0, 7);
+  const txMes = tx.filter(t => t.fecha.startsWith(mesActual) && t.egreso_kg > 0);
+  const porCat = {};
+  txMes.forEach(t => { porCat[t.concepto] = (porCat[t.concepto] || 0) + t.egreso_kg; });
+  const entries = Object.entries(porCat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: entries.map(e => e[0]),
+      datasets: [{
+        label: "kg carne",
+        data: entries.map(e => e[1]),
+        backgroundColor: "rgba(192,133,82,0.7)",
+        borderColor: "#c08552",
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: "Egresos del mes por categoría (kg carne)",
+          color: "#e8dcc8",
+          font: { family: "Manrope", size: 13, weight: 600 }
+        }
+      },
+      scales: {
+        y: { ticks: { color: "#8a7a68", font: { family: "JetBrains Mono", size: 11 } }, grid: { color: "#3a2c22" } },
+        x: { ticks: { color: "#8a7a68", font: { family: "JetBrains Mono", size: 10 }, maxRotation: 45 }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function dibujarChartMag() {
+  const ctx = document.getElementById("chartMag");
+  if (!ctx) return;
+  const h = (estado.mag?.historial || []).slice().reverse();
+  if (!h.length) return;
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: h.map(p => p.semana),
+      datasets: [{
+        label: "$/kg",
+        data: h.map(p => p.precio_promedio),
+        borderColor: "#c08552",
+        backgroundColor: "rgba(192,133,82,0.15)",
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: "#d4a548",
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: "#8a7a68", font: { family: "JetBrains Mono", size: 11 } }, grid: { color: "#3a2c22" } },
+        x: { ticks: { color: "#8a7a68", font: { family: "JetBrains Mono", size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Refrescar MAG ──────────────────────────────────────────────────────────
+async function refrescarMag() {
+  document.getElementById("magHeaderVal").textContent = "scrapeando...";
+  try {
+    const r = await fetch(API + "/api/mag/refrescar", { method: "POST" });
+    const d = await r.json();
+    if (d.ok) {
+      addBotMsg(`✅ MAG actualizado: ${d.semana} = $${fmtArs(d.precio)}/kg`);
+    } else {
+      addBotMsg(`⚠️ No se pudo scrapear el MAG. Probá más tarde.`);
+    }
+    await cargarTodo();
+  } catch (e) {
+    addBotMsg(`❌ Error refrescando MAG: ${e.message}`);
+  }
+}
+
+// ── CHAT ──────────────────────────────────────────────────────────────────
+function addUserMsg(t) {
+  const el = document.createElement("div");
+  el.className = "msg user";
+  el.textContent = t;
+  document.getElementById("chatMessages").appendChild(el);
+  scrollChat();
+}
+function addBotMsg(t) {
+  const el = document.createElement("div");
+  el.className = "msg bot";
+  // formato negrita simple (*texto*)
+  el.innerHTML = t.replace(/\*([^*]+)\*/g, "<strong>$1</strong>");
+  document.getElementById("chatMessages").appendChild(el);
+  scrollChat();
+}
+function scrollChat() {
+  const m = document.getElementById("chatMessages");
+  m.scrollTop = m.scrollHeight;
+}
+
+document.getElementById("chatForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const inp = document.getElementById("chatInput");
+  const txt = inp.value.trim();
+  if (!txt) return;
+  addUserMsg(txt);
+  inp.value = "";
+  document.getElementById("sendBtn").disabled = true;
+
+  // Indicador de escritura
+  const typing = document.createElement("div");
+  typing.className = "msg bot";
+  typing.id = "typing";
+  typing.textContent = "...";
+  document.getElementById("chatMessages").appendChild(typing);
+  scrollChat();
+
+  try {
+    const r = await fetch(API + "/webhook-interno", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "Body=" + encodeURIComponent(txt)
+    });
+    const d = await r.json();
+    document.getElementById("typing")?.remove();
+    addBotMsg(d.respuesta || "(sin respuesta)");
+    cargarTodo(); // refrescar datos por si cambió algo
+  } catch (e) {
+    document.getElementById("typing")?.remove();
+    addBotMsg("❌ Error de conexión: " + e.message);
+  }
+  document.getElementById("sendBtn").disabled = false;
+});
+
+function enviarSug(t) {
+  document.getElementById("chatInput").value = t;
+  document.getElementById("chatForm").dispatchEvent(new Event("submit"));
+}
+
+// Init
+cargarTodo();
+setInterval(cargarTodo, 60000); // refresco cada minuto
+</script>
+
+</body>
+</html>
