@@ -1,4 +1,4 @@
-# VIDELA — Bot Financiero Ganadero (Argentina)
+# VIDELA —  Bot Financiero Ganadero (Argentina)
 
 Sistema de gestión financiera ganadera adaptado de IMPROLUX a Argentina. Todo se mide en **kg carne** usando el promedio semanal del **Índice Novillo MAG** (Mercado Agroganadero, Cañuelas).
 
