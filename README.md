@@ -96,3 +96,4 @@ Marzo a febrero del año siguiente. "Ciclo 25/26" = marzo 2025 → febrero 2026.
 ## Licencia
 
 Privado — uso interno.
+ 
