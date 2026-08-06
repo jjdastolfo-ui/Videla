@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cabaña Amakaik · Sistema de Gestión</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  /* Paleta VIDELA / Cabaña Amakaik */
+  --marron-cuero: #2b1810;
+  --marron-cuero-2: #3d1e08;
+  --marron-cuero-3: #6b3410;
+  --marron-medio: #a35a2a;
+  --trigo: #d4a574;
+  --trigo-claro: #e7ce8c;
+  --gold: #c4923a;
+  --crema: #f4ead5;
+  --crema-2: #ebe0c8;
+  --crema-3: #dfd0b2;
+  --tinta: #2b1810;
+  --linea: rgba(107, 52, 16, .14);
+  --muted: #6b5b48;
+  --muted-2: #8f7d67;
+  --verde-campo: #5a7d3a;
+  --rojo-tierra: #a63a2e;
+  --bordeau: #8B1A1A;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100vh;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--tinta);
+  background: var(--crema);
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(196, 146, 58, .08) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 90%, rgba(107, 52, 16, .06) 0%, transparent 50%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ═══ HEADER ═══ */
+.top {
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--linea);
+}
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--marron-cuero-3) 0%, var(--marron-cuero-2) 100%);
+  color: var(--trigo-claro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: -.02em;
+  box-shadow: 0 6px 20px rgba(43, 24, 16, .3), inset 0 1px 0 rgba(231, 206, 140, .15);
+  position: relative;
+}
+.brand-logo::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(231, 206, 140, .18);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.brand-info {
+  flex: 1;
+}
+.brand-name {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 26px;
+  color: var(--marron-cuero);
+  letter-spacing: -.01em;
+  line-height: 1.1;
+}
+.brand-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.top-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pill {
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pill .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--verde-campo);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+/* ═══ HERO / TAGLINE ═══ */
+.hero {
+  text-align: center;
+  padding: 48px 32px 40px;
+}
+.hero h1 {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(32px, 5vw, 46px);
+  color: var(--marron-cuero);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  margin-bottom: 12px;
+}
+.hero .sub {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 560px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* ═══ CARDS ═══ */
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 8px 32px 48px;
+}
+@media (max-width: 900px) {
+  .cards { grid-template-columns: 1fr; padding: 8px 20px 32px; }
+  .top { padding: 16px 20px; }
+  .hero { padding: 32px 20px 24px; }
+}
+
+.card {
+  background: var(--crema);
+  border: 1px solid var(--linea);
+  border-radius: 20px;
+  padding: 32px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, transparent 70%, currentColor 200%);
+  opacity: .05;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 50px rgba(43, 24, 16, .12);
+  border-color: rgba(107, 52, 16, .3);
+}
+.card:hover::before { opacity: .08; }
+
+.card.finanzas {
+  color: var(--marron-cuero);
+  background: linear-gradient(135deg, var(--crema) 0%, var(--crema-2) 100%);
+}
+.card.ganaderia {
+  color: var(--bordeau);
+  background: linear-gradient(135deg, #FBF5EA 0%, #F1E4CE 100%);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .5);
+  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+.card.finanzas .card-icon {
+  background: linear-gradient(135deg, var(--marron-cuero-3) 0%, var(--marron-cuero-2) 100%);
+  color: var(--trigo-claro);
+  border-color: var(--gold);
+}
+.card.ganaderia .card-icon {
+  background: linear-gradient(135deg, var(--bordeau) 0%, #6B0F0F 100%);
+  color: var(--trigo-claro);
+  border-color: var(--gold);
+}
+.card-title-block { flex: 1; min-width: 0; }
+.card-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 28px;
+  letter-spacing: -.01em;
+  line-height: 1.1;
+  color: inherit;
+}
+.card-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+/* KPIs dentro de la card */
+.kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex: 1;
+  align-content: start;
+}
+.kpi {
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 76px;
+}
+.kpi-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.kpi-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: inherit;
+  line-height: 1.1;
+}
+.kpi-sub {
+  font-size: 10px;
+  color: var(--muted-2);
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.kpi.loading .kpi-val {
+  color: var(--muted-2);
+  opacity: .35;
+}
+.kpi.pos .kpi-val { color: var(--verde-campo); }
+.kpi.neg .kpi-val { color: var(--rojo-tierra); }
+
+.card-cta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .02em;
+  color: white;
+  align-self: flex-start;
+  transition: gap .25s ease;
+}
+.card.finanzas .card-cta {
+  background: linear-gradient(135deg, var(--marron-cuero-3) 0%, var(--marron-cuero-2) 100%);
+  box-shadow: 0 4px 14px rgba(107, 52, 16, .28);
+}
+.card.ganaderia .card-cta {
+  background: linear-gradient(135deg, var(--bordeau) 0%, #6B0F0F 100%);
+  box-shadow: 0 4px 14px rgba(139, 26, 26, .28);
+}
+.card:hover .card-cta { gap: 14px; }
+.card-cta .arrow { transition: transform .25s ease; }
+.card:hover .card-cta .arrow { transform: translateX(4px); }
+
+/* ═══ FOOTER ═══ */
+.footer {
+  padding: 24px 32px 32px;
+  text-align: center;
+  border-top: 1px solid var(--linea);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted-2);
+  letter-spacing: .08em;
+}
+.footer-brand {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--marron-cuero-3);
+  margin-bottom: 4px;
+  letter-spacing: 0;
+}
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 600px) {
+  .top-right { display: none; }
+  .card { padding: 24px; min-height: auto; }
+  .card-title { font-size: 22px; }
+  .card-icon { width: 48px; height: 48px; font-size: 22px; }
+  .kpi-val { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<div class="top">
+  <div class="brand-logo">A</div>
+  <div class="brand-info">
+    <div class="brand-name">Cabaña Amakaik</div>
+    <div class="brand-sub">Videla Dorna · Buenos Aires · Argentina</div>
+  </div>
+  <div class="top-right">
+    <div class="pill"><div class="dot"></div>Sistemas activos</div>
+    <div class="pill" id="magPill">MAG&nbsp;<b id="magVal" style="color:var(--marron-cuero-3);margin-left:2px">—</b></div>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<div class="hero">
+  <h1>Sistema de gestión integral</h1>
+  <div class="sub">Manejo financiero y ganadero de la cabaña en un solo lugar. Elegí por dónde arrancar.</div>
+</div>
+
+<!-- ═══ CARDS ═══ -->
+<div class="cards">
+
+  <!-- FINANZAS / VIDELA -->
+  <a href="/videla" class="card finanzas">
+    <div class="card-head">
+      <div class="card-icon">V</div>
+      <div class="card-title-block">
+        <div class="card-title">Finanzas</div>
+        <div class="card-sub">VIDELA · Gestión Financiera</div>
+      </div>
+    </div>
+    <div class="card-desc">Flujos, cheques, cuentas corrientes, inversores, presupuestos, aportes de socios. Todo medido en kg carne (INMAG Cañuelas).</div>
+
+    <div class="kpis">
+      <div class="kpi loading" id="kpi-neto-mes">
+        <div class="kpi-lbl">Neto del mes</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">kg carne</div>
+      </div>
+      <div class="kpi loading" id="kpi-cheques">
+        <div class="kpi-lbl">Cheques pend.</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">a pagar/cobrar</div>
+      </div>
+      <div class="kpi loading" id="kpi-aportes">
+        <div class="kpi-lbl">Aportes patrim.</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">total kg</div>
+      </div>
+      <div class="kpi loading" id="kpi-transacciones">
+        <div class="kpi-lbl">Movimientos</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">registrados</div>
+      </div>
+    </div>
+
+    <div class="card-cta">Ingresar a finanzas <span class="arrow">→</span></div>
+  </a>
+
+  <!-- GANADERÍA / ADE -->
+  <a href="/ade" class="card ganaderia">
+    <div class="card-head">
+      <div class="card-icon">A</div>
+      <div class="card-title-block">
+        <div class="card-title">Ganadería</div>
+        <div class="card-sub">ADE · Angus del Este</div>
+      </div>
+    </div>
+    <div class="card-desc">Manejo del hato: animales individuales, pesadas, sanidad, servicios y preñeces, envíos, racionamiento. Ganadería de precisión.</div>
+
+    <div class="kpis">
+      <div class="kpi loading" id="kpi-cabezas">
+        <div class="kpi-lbl">Cabezas hoy</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">total activo</div>
+      </div>
+      <div class="kpi loading" id="kpi-pesadas">
+        <div class="kpi-lbl">Última pesada</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">promedio kg</div>
+      </div>
+      <div class="kpi loading" id="kpi-lotes">
+        <div class="kpi-lbl">Lotes activos</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">con animales</div>
+      </div>
+      <div class="kpi loading" id="kpi-eventos">
+        <div class="kpi-lbl">Eventos mes</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-sub">registrados</div>
+      </div>
+    </div>
+
+    <div class="card-cta">Ingresar a ganadería <span class="arrow">→</span></div>
+  </a>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div class="footer">
+  <div class="footer-brand">Cabaña Amakaik</div>
+  <div>VIDELA v3.0 · Sistema propio · Datos en kg carne INMAG</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// KPIs vivos: los tiramos con Promise.all en paralelo. Si algo falla, la KPI
+// queda con "—" y no rompe el resto.
+// ══════════════════════════════════════════════════════════════════════════════
+const VIDELA_URL = window.location.origin;
+const ADE_URL = 'https://jjdastolfo-ui.github.io/angus-del-este';
+// El bot de ADE / API todavía no tiene endpoint público de "resumen" desde acá.
+// Cuando lo tengas, pega la URL de su API en ADE_API.
+const ADE_API = null; // TODO: cuando ADE exponga endpoints REST, poner acá su base URL
+
+const fmtKg = n => {
+  const v = parseFloat(n || 0);
+  if (Math.abs(v) >= 1000) return v.toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' kg';
+  return v.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' kg';
+};
+const fmt = n => '$' + parseFloat(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+
+function setKPI(id, val, sub, extraClass) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('loading', 'pos', 'neg');
+  if (extraClass) el.classList.add(extraClass);
+  el.querySelector('.kpi-val').textContent = val;
+  if (sub !== undefined) el.querySelector('.kpi-sub').textContent = sub;
+}
+
+// ── Cargar precio MAG en el pill del header ──────────────────────────────────
+fetch(`${VIDELA_URL}/api/mag`)
+  .then(r => r.json())
+  .then(d => {
+    const precio = d?.actual?.precio;
+    if (precio) {
+      document.getElementById('magVal').textContent = '$' + Math.round(precio) + '/kg';
+      document.getElementById('magPill').title = 'Índice Novillo MAG Cañuelas · semana ' + (d.actual.semana || '');
+    } else {
+      document.getElementById('magVal').textContent = 'N/D';
+    }
+  })
+  .catch(() => { document.getElementById('magVal').textContent = 'N/D'; });
+
+// ── KPIs de FINANZAS (VIDELA) ────────────────────────────────────────────────
+(async () => {
+  try {
+    const [resumen, cheques, aportes, transacciones] = await Promise.all([
+      fetch(`${VIDELA_URL}/api/resumen`).then(r => r.json()).catch(() => ({})),
+      fetch(`${VIDELA_URL}/api/cheques`).then(r => r.json()).catch(() => []),
+      fetch(`${VIDELA_URL}/api/aportes/resumen`).then(r => r.json()).catch(() => ({})),
+      fetch(`${VIDELA_URL}/api/transacciones`).then(r => r.json()).catch(() => [])
+    ]);
+
+    // Neto del mes en kg
+    const netoKg = (resumen.ingresos_mes_kg || 0) - (resumen.egresos_mes_kg || 0);
+    const signo = netoKg >= 0 ? '+' : '';
+    setKPI('kpi-neto-mes',
+      signo + fmtKg(netoKg),
+      resumen.egresos_mes ? fmt(Math.abs(resumen.egresos_mes)) + ' egresos' : 'sin movimientos',
+      netoKg >= 0 ? 'pos' : 'neg');
+
+    // Cheques pendientes
+    const pend = (cheques || []).filter(c => c.estado === 'PENDIENTE');
+    const totalKg = pend.reduce((s, c) => s + parseFloat(c.monto_kg || 0), 0);
+    setKPI('kpi-cheques',
+      pend.length ? pend.length + ' cheq.' : '0',
+      pend.length ? fmtKg(totalKg) : 'ninguno');
+
+    // Aportes patrimoniales
+    setKPI('kpi-aportes',
+      fmtKg(aportes.total_general_kg || 0),
+      (aportes.socios || []).length + ' socios');
+
+    // Total movimientos
+    setKPI('kpi-transacciones',
+      (transacciones || []).length,
+      (transacciones || []).length === 1 ? 'registrado' : 'registrados');
+  } catch (e) {
+    console.warn('No pude cargar KPIs VIDELA:', e);
+  }
+})();
+
+// ── KPIs de GANADERÍA (ADE) ───────────────────────────────────────────────────
+// Nota: mientras ADE no tenga API pública de resumen, los dejamos como
+// placeholder amable. Cuando ADE exponga endpoints REST, se llenan.
+(async () => {
+  if (!ADE_API) {
+    // Placeholder discreto
+    setKPI('kpi-cabezas', 'Ver', 'entrá al sistema');
+    setKPI('kpi-pesadas', 'Ver', 'entrá al sistema');
+    setKPI('kpi-lotes', 'Ver', 'entrá al sistema');
+    setKPI('kpi-eventos', 'Ver', 'entrá al sistema');
+    return;
+  }
+  try {
+    const res = await fetch(`${ADE_API}/api/resumen?campo=angus_la_posta`);
+    const d = await res.json();
+    setKPI('kpi-cabezas', d.cabezas_total || '—', 'total activo');
+    setKPI('kpi-pesadas', d.ultima_pesada_promedio ? d.ultima_pesada_promedio + ' kg' : '—',
+           d.ultima_pesada_fecha || '—');
+    setKPI('kpi-lotes', d.lotes_activos || '—', 'con animales');
+    setKPI('kpi-eventos', d.eventos_mes || '—', 'este mes');
+  } catch (e) {
+    console.warn('No pude cargar KPIs ADE:', e);
+  }
+})();
+</script>
+</body>
+</html>
