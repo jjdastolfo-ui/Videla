@@ -4921,19 +4921,48 @@ app.post("/api/ganado/sync-ade", async (req, res) => {
     'EL TRIUNFO':   'el_triunfo',
     'LA GUAGUA':    'la_guagua'
   };
+  // La empresa tiene hacienda repartida en varios campos: para valuar el
+  // patrimonio hay que sumarlos todos, no mirar uno solo.
+  const CAMPOS_EMPRESA = ['angus_la_posta', 'el_triunfo', 'la_guagua'];
   const campoFin = String(req.body.campo || req.query.campo || '').toUpperCase().trim();
-  const campoAde = req.body.campo_ade
-    || PAR_GANADERO[campoFin]
-    || process.env.ADE_CAMPO
-    || 'angus_la_posta';
+  const pedidos = req.body.campos_ade
+    || (req.body.campo_ade ? [req.body.campo_ade]
+        : (PAR_GANADERO[campoFin] && campoFin !== 'AMAKAIK' && campoFin !== 'CAMPO VIDELA')
+          ? [PAR_GANADERO[campoFin]]
+          : CAMPOS_EMPRESA);
+
   try {
-    const resp = await fetch(`${ADE_URL}/api/rodeo-resumen?campo=${encodeURIComponent(campoAde)}`);
-    if (!resp.ok) return res.status(502).json({ error: `ADE respondió ${resp.status}. Verificá que el endpoint /api/rodeo-resumen exista y sea público.` });
-    const data = await resp.json();
-    // Tolerante al formato: array directo o envuelto en rodeo/categorias/data
-    const lista = Array.isArray(data) ? data : (data.rodeo || data.categorias || data.data || []);
-    if (!Array.isArray(lista) || !lista.length) {
-      return res.json({ ok: true, actualizados: 0, creados: 0, mensaje: 'ADE no devolvió categorías', crudo: data });
+    // Se suman las categorías de todos los campos: una vaca PP en El Triunfo y
+    // otra en La Guagua son dos vacas PP del mismo rodeo.
+    const acum = new Map();
+    const traidos = [], fallados = [];
+    for (const c of pedidos) {
+      let data;
+      try {
+        const r = await fetch(`${ADE_URL}/api/rodeo-resumen?campo=${encodeURIComponent(c)}`);
+        if (!r.ok) { fallados.push(`${c} (HTTP ${r.status})`); continue; }
+        data = await r.json();
+      } catch (e) { fallados.push(`${c} (${String(e.message).slice(0,40)})`); continue; }
+
+      const l = Array.isArray(data) ? data : (data.rodeo || data.categorias || data.data || []);
+      if (!Array.isArray(l) || !l.length) continue;
+      traidos.push(c);
+      for (const it of l) {
+        const cat = it.categoria || it.category || it.nombre || it.cat;
+        const reg = (it.registro || it.pedigree || 'GENERAL').toUpperCase();
+        if (!cat) continue;
+        const k = `${String(cat).toUpperCase()}|${reg}`;
+        if (!acum.has(k)) acum.set(k, { categoria: cat, registro: reg, plantel: 0, venta: 0 });
+        const a = acum.get(k);
+        a.plantel += parseFloat(it.plantel ?? it.cantidad ?? it.count ?? 0) || 0;
+        a.venta   += parseFloat(it.venta ?? it.cantidad_venta ?? 0) || 0;
+      }
+    }
+    const lista = [...acum.values()];
+    if (!lista.length) {
+      return res.json({ ok: true, actualizados: 0, creados: 0,
+        mensaje: fallados.length ? `No pude leer: ${fallados.join(', ')}` : 'ADE no devolvió categorías',
+        campos_consultados: pedidos, campos_con_datos: traidos });
     }
     const getByCatReg = db.prepare("SELECT * FROM stock_ganadero WHERE LOWER(categoria) = LOWER(?) AND LOWER(COALESCE(registro,'GENERAL')) = LOWER(?)");
     const upd = db.prepare("UPDATE stock_ganadero SET cantidad = ?, cantidad_venta = ?, origen = 'ade', updated_at = datetime('now') WHERE id = ?");
@@ -4950,7 +4979,10 @@ app.post("/api/ganado/sync-ade", async (req, res) => {
       if (ex) { upd.run(plantel, venta, ex.id); actualizados++; }
       else { ins.run(cat, reg, plantel, venta); creados++; }
     }
-    res.json({ ok: true, actualizados, creados, total_cabezas: totalCab, categorias: lista.length });
+    res.json({ ok: true, actualizados, creados, total_cabezas: totalCab, categorias: lista.length,
+      campos: traidos, campos_sin_datos: fallados,
+      mensaje: `${totalCab} cabezas sumando ${traidos.length} campo${traidos.length>1?'s':''}` +
+        (fallados.length ? ` · no pude leer: ${fallados.join(', ')}` : '') });
   } catch (e) {
     res.status(502).json({ error: 'No pude conectar con ADE: ' + String(e.message).slice(0, 150) });
   }
