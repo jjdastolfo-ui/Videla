@@ -699,6 +699,12 @@ let data = { transacciones:[], cuentas:[], cheques:[], inversores:[], resumen:{}
 const fmt  = n => '$' + parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmt2 = n => '$' + parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 // Formato kg carne (unidad primaria de VIDELA): con 1 decimal
+
+// Movimientos que salen de caja pero NO son gasto del negocio: distribución de
+// resultado y capital. Sumarlos infla el costo del ejercicio.
+const NO_OPERATIVOS = ['DIVIDENDOS','RETIRO SOCIOS','RETIRO DE SOCIOS',
+                       'APORTE SOCIOS','APORTE DE SOCIOS','DISTRIBUCION UTILIDADES'];
+const esOperativo = c => !NO_OPERATIVOS.includes(String(c||'').toUpperCase().trim());
 const fmtKg = n => {
   const v = parseFloat(n);
   if (!Number.isFinite(v)) return '— kg';
@@ -1945,7 +1951,10 @@ function renderFlujos(area) {
 
   // Categorías (en kg carne)
   const porCat = {};
+  let retiros = 0;
   tx.forEach(t => {
+    // Los retiros de socios salen de caja pero no son gasto: van aparte.
+    if (!esOperativo(t.concepto)) { retiros += parseFloat(t.egreso_kg||0); return; }
     if (!porCat[t.concepto]) porCat[t.concepto] = { egreso: 0, ingreso: 0 };
     porCat[t.concepto].egreso += parseFloat(t.egreso_kg||0);
     porCat[t.concepto].ingreso += parseFloat(t.ingreso_kg||0);
@@ -2097,6 +2106,8 @@ function renderFlujos(area) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="dash-card" style="padding:16px">
           <div style="font-size:12px;font-weight:600;margin-bottom:12px">Top egresos por categoría</div>
+          ${retiros > 0 ? `<div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">
+            Además se retiraron ${fmtKg(retiros)} en dividendos — no cuentan como gasto del negocio.</div>` : ''}
           <div class="bar-chart">
             ${cats.filter(([,v]) => v.egreso > 0).slice(0,10).map(([cat,v]) => `
               <div class="bar-row">

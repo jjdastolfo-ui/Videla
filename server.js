@@ -29,6 +29,14 @@ app.get("/finanzas", (req, res) => res.sendFile(path.join(__dirname, "index.html
 app.get("/ade", (req, res) => res.redirect("https://jjdastolfo-ui.github.io/angus-del-este/ADE_v4.html?campo=angus_la_posta"));
 app.get("/ganaderia", (req, res) => res.redirect("https://jjdastolfo-ui.github.io/angus-del-este/ADE_v4.html?campo=angus_la_posta"));  // alias
 
+
+// ── CONCEPTOS NO OPERATIVOS ──────────────────────────────────────────────────
+// Movimientos que afectan la caja pero NO son gasto del negocio.
+const NO_OPERATIVOS = ['DIVIDENDOS', 'RETIRO SOCIOS', 'RETIRO DE SOCIOS',
+                       'APORTE SOCIOS', 'APORTE DE SOCIOS', 'DISTRIBUCION UTILIDADES'];
+const SQL_NO_OPERATIVOS = NO_OPERATIVOS.map(c => `'${c}'`).join(',');
+const FILTRO_OPERATIVO = `upper(COALESCE(concepto,'')) NOT IN (${SQL_NO_OPERATIVOS})`;
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -1924,7 +1932,7 @@ function getInformeCiclo(cicloStr, tipo = 'productivo') {
            SUM(ingreso)    as total_ingreso_ars,
            COUNT(*) as cant_movimientos
     FROM transacciones
-    WHERE fecha >= ? AND fecha <= ?
+    WHERE fecha >= ? AND fecha <= ? AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total_egreso DESC
   `).all(ciclo.fecha_desde, fechaHasta);
 
@@ -1954,7 +1962,7 @@ function getInformeMensual(anio, mes) {
            SUM(egreso)     as total_egreso_ars,
            SUM(ingreso)    as total_ingreso_ars,
            COUNT(*) as cant
-    FROM transacciones WHERE fecha LIKE ?
+    FROM transacciones WHERE fecha LIKE ? AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total_egreso DESC
   `).all(`${periodo}-%`);
 
@@ -2054,6 +2062,11 @@ const DB_SCHEMA = `Base SQLite de VIDELA (Cabaña Amakaik, Argentina). Montos du
 - stock_movimientos(id, producto_id, fecha, tipo 'ENTRADA'/'SALIDA'/'AJUSTE', cantidad, precio_unitario)
 - presupuestos(id, ciclo, concepto, monto_anual). monto_anual está en KG DE CARNE, no en pesos.
 
+GASTO OPERATIVO vs NO OPERATIVO: DIVIDENDOS, RETIRO SOCIOS y APORTE SOCIOS son
+distribución de resultado o capital: afectan la caja pero NO son gasto del negocio.
+Al informar gastos, costos o comparar contra el presupuesto, EXCLUÍLOS. En flujo de
+caja o saldo sí van incluidos.
+
 UNIDAD DEL SISTEMA: todo se informa en KG DE CARNE (índice novillo MAG), que no se
 licúa con la inflación. Cada movimiento tiene su par: ingreso/egreso en ARS e
 ingreso_kg/egreso_kg en kilos. Para totales, presupuestos, comparaciones entre
@@ -2103,7 +2116,7 @@ async function buildContexto() {
   const egresosMes = db.prepare(`
     SELECT concepto, SUM(egreso_kg) as total, SUM(egreso) as total_ars
     FROM transacciones
-    WHERE fecha LIKE ? AND egreso > 0
+    WHERE fecha LIKE ? AND egreso > 0 AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total DESC LIMIT 10
   `).all(`${mesActual}-%`);
 
