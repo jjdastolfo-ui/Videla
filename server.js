@@ -2504,8 +2504,11 @@ async function ejecutarAccion(accion) {
   }
 
   // Cheques de terceros. Devuelve null si la acción no es suya y sigue el resto.
+  // Acá la plata se lleva en kg de carne, así que va con el precio MAG de la
+  // semana: sin eso el módulo se niega a escribir en vez de dejar los kg en 0.
   if (cheques && cheques.MANEJA.includes(accion.accion)) {
-    const r = cheques.ejecutarAccion(db, accion, { moneda: "ARS" });
+    const mag = await getPrecioReferencia(accion.fecha || accion.fecha_cobro || hoy);
+    const r = cheques.ejecutarAccion(db, accion, { moneda: "ARS", precio_mag: mag && mag.precio, semana_mag: mag && mag.semana });
     if (r != null) return r;
   }
 

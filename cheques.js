@@ -92,15 +92,56 @@ function ctxDe(ctx = {}) {
     moneda: ctx.moneda || "USD",
     fuente: ctx.fuente || "whatsapp",
     concepto_venta: ctx.concepto_venta || "VENTA GANADO",
-    concepto_pago_cc: ctx.concepto_pago_cc || "PAGO CUENTA CORRIENTE"
+    concepto_pago_cc: ctx.concepto_pago_cc || "PAGO CUENTA CORRIENTE",
+    // Sólo en VIDELA: el precio MAG de la semana, para el gemelo en kg.
+    precio_mag: ctx.precio_mag > 0 ? Number(ctx.precio_mag) : null,
+    semana_mag: ctx.semana_mag || null
   };
 }
 
-function insertarTransaccion(db, { fecha, concepto, detalle, ingreso, egreso, proveedor, fuente }) {
+const enKg = (monto, p) => p ? ` · ${(Math.round((monto / p) * 10) / 10).toLocaleString("es-UY")} kg` : "";
+
+// VIDELA no lleva la plata en pesos: lleva kg de carne, y los pesos son la
+// referencia. Cada monto tiene su gemelo en kg al precio MAG de la semana. No
+// se puede dar por sentado el esquema: se le pregunta a la tabla qué columnas
+// tiene, y si están las de kg se llenan. Un cero en kg ahí no es un dato que
+// falta, es un número mal.
+const _esquema = new WeakMap();
+function tieneCol(db, tabla, col) {
+  let m = _esquema.get(db);
+  if (!m) { m = new Map(); _esquema.set(db, m); }
+  if (!m.has(tabla)) {
+    let cols = [];
+    try { cols = db.prepare(`PRAGMA table_info(${tabla})`).all().map(c => c.name); } catch (e) {}
+    m.set(tabla, new Set(cols));
+  }
+  return m.get(tabla).has(col);
+}
+/** ¿Este sistema lleva los montos también en kg de carne? */
+const llevaKg = db => tieneCol(db, "transacciones", "ingreso_kg");
+
+/** Si lleva kg y no nos pasaron el precio, no se escribe nada. */
+function faltaPrecio(db, ctx) {
+  if (!llevaKg(db) || ctx.precio_mag > 0) return null;
+  return "Este sistema lleva los montos en kg de carne y no tengo el precio MAG de la semana. Sin eso, el movimiento quedaría en 0 kg y los informes en kilos saldrían mal.";
+}
+
+function insertarTransaccion(db, t) {
+  const ing = t.ingreso || 0, egr = t.egreso || 0;
+  if (llevaKg(db)) {
+    const p = t.precio_mag;
+    const r = db.prepare(`INSERT INTO transacciones
+      (fecha, concepto, detalle, ingreso, egreso, ingreso_kg, egreso_kg, precio_mag, semana_mag, proveedor, es_cc, tc, fuente)
+      VALUES (?,?,?,?,?,?,?,?,?,?,0,0,?)`)
+      .run(t.fecha, t.concepto, t.detalle || "", ing, egr,
+        p ? ing / p : 0, p ? egr / p : 0, p || null, t.semana_mag || null,
+        t.proveedor || "", t.fuente);
+    return r.lastInsertRowid;
+  }
   const r = db.prepare(`INSERT INTO transacciones
     (fecha, concepto, detalle, ingreso, egreso, proveedor, es_cc, tc, fuente)
     VALUES (?,?,?,?,?,?,0,0,?)`)
-    .run(fecha, concepto, detalle || "", ingreso || 0, egreso || 0, proveedor || "", fuente);
+    .run(t.fecha, t.concepto, t.detalle || "", ing, egr, t.proveedor || "", t.fuente);
   return r.lastInsertRowid;
 }
 
@@ -147,6 +188,8 @@ function recibir(db, datos = {}, ctx = {}) {
   const c = ctxDe(ctx);
   const monto = num(datos.monto);
   if (!monto || monto <= 0) return { ok: false, error: "Falta el monto del cheque." };
+  const sinPrecio = faltaPrecio(db, c);
+  if (sinPrecio) return { ok: false, error: sinPrecio };
 
   const fecha = datos.fecha_recepcion || datos.fecha || hoyISO();
   const numero = datos.numero ? String(datos.numero).trim() : null;
@@ -182,13 +225,21 @@ function recibir(db, datos = {}, ctx = {}) {
       datos.notas || null
     );
 
+  // El gemelo en kg, donde el sistema lo lleva.
+  if (c.precio_mag && tieneCol(db, "cheques", "monto_kg")) {
+    try {
+      db.prepare(`UPDATE cheques SET monto_kg=?, precio_mag=? WHERE id=?`)
+        .run(monto / c.precio_mag, c.precio_mag, r.lastInsertRowid);
+    } catch (e) {}
+  }
+
   const vto = datos.fecha_cobro || datos.vencimiento;
   const total = cartera(db).total;
   return {
     ok: true, id: r.lastInsertRowid, monto, numero,
     mensaje: [
       `📥 Cheque en cartera · #${r.lastInsertRowid}`,
-      `${datos.es_electronico || datos.echeq ? "e-cheq" : "Cheque"}${numero ? " " + numero : ""} · ${fmt(monto)} ${c.moneda}`,
+      `${datos.es_electronico || datos.echeq ? "e-cheq" : "Cheque"}${numero ? " " + numero : ""} · ${fmt(monto)} ${c.moneda}${enKg(monto, c.precio_mag)}`,
       datos.recibido_de || datos.de ? `De: ${datos.recibido_de || datos.de}` : null,
       vto ? `Vence: ${vto}` : "Sin fecha de vencimiento",
       num(datos.kg_carne) ? `${fmt(num(datos.kg_carne))} kg de carne, se reconocen al cobrarlo` : null,
@@ -206,6 +257,8 @@ function cobrar(db, ref, datos = {}, ctx = {}) {
   if (!["EN_CARTERA", "PENDIENTE"].includes(cheque.estado)) {
     return { ok: false, error: `El cheque #${cheque.id} ya está ${ESTADOS[cheque.estado] || cheque.estado}.` };
   }
+  const sinPrecio = faltaPrecio(db, c);
+  if (sinPrecio) return { ok: false, error: sinPrecio };
 
   const fecha = datos.fecha || hoyISO();
   const concepto = datos.concepto || cheque.concepto_cobro || c.concepto_venta;
@@ -218,7 +271,8 @@ function cobrar(db, ref, datos = {}, ctx = {}) {
 
   const idIngreso = insertarTransaccion(db, {
     fecha, concepto, detalle, ingreso: cheque.monto, egreso: 0,
-    proveedor: quien, fuente: c.fuente
+    proveedor: quien, fuente: c.fuente,
+    precio_mag: c.precio_mag, semana_mag: c.semana_mag
   });
 
   db.prepare(`UPDATE cheques SET estado='COBRADO', fecha_acreditacion=?,
@@ -229,7 +283,7 @@ function cobrar(db, ref, datos = {}, ctx = {}) {
     kg_carne: cheque.kg_carne || null,
     mensaje: [
       `✅ Cheque #${cheque.id} cobrado · ${fecha}`,
-      `${fmt(cheque.monto)} ${c.moneda} entraron al flujo como ${concepto}.`,
+      `${fmt(cheque.monto)} ${c.moneda}${enKg(cheque.monto, c.precio_mag)} entraron al flujo como ${concepto}.`,
       quien ? `De: ${quien}` : null,
       cheque.kg_carne ? `Se reconocen ${fmt(cheque.kg_carne)} kg de carne.` : null
     ].filter(Boolean).join("\n")
@@ -247,6 +301,8 @@ function endosar(db, ref, datos = {}, ctx = {}) {
   }
   const a = datos.entregado_a || datos.a || datos.proveedor;
   if (!a) return { ok: false, error: "¿A quién se lo endosaste?" };
+  const sinPrecio = faltaPrecio(db, c);
+  if (sinPrecio) return { ok: false, error: sinPrecio };
 
   const fecha = datos.fecha || hoyISO();
   const quien = cheque.recibido_de || cheque.proveedor || "";
@@ -268,22 +324,27 @@ function endosar(db, ref, datos = {}, ctx = {}) {
   const idIngreso = insertarTransaccion(db, {
     fecha, concepto: conceptoCobro,
     detalle: `Cobro de ${refCheque}${quien ? ` de ${quien}` : ""} · endosado a ${a}`,
-    ingreso: cheque.monto, egreso: 0, proveedor: quien, fuente: c.fuente
+    ingreso: cheque.monto, egreso: 0, proveedor: quien, fuente: c.fuente,
+    precio_mag: c.precio_mag, semana_mag: c.semana_mag
   });
 
   // Pata 2: el pago. Mismo monto, misma fecha: la caja queda igual.
   const idEgreso = insertarTransaccion(db, {
     fecha, concepto: conceptoPago,
     detalle: `Pago a ${a} con ${refCheque}${esCC ? " (cuenta corriente)" : ""}`,
-    ingreso: 0, egreso: cheque.monto, proveedor: a, fuente: c.fuente
+    ingreso: 0, egreso: cheque.monto, proveedor: a, fuente: c.fuente,
+    precio_mag: c.precio_mag, semana_mag: c.semana_mag
   });
 
   // Y si era cuenta corriente, se descuenta la deuda.
   let idCC = null;
   if (esCC) {
     try {
-      const rcc = db.prepare(`INSERT INTO cc_movimientos (fecha, proveedor, monto, medio, notas)
-        VALUES (?,?,?,?,?)`).run(fecha, a, cheque.monto,
+      const conKg = c.precio_mag && tieneCol(db, "cc_movimientos", "monto_kg");
+      const rcc = db.prepare(conKg
+        ? `INSERT INTO cc_movimientos (fecha, proveedor, monto, monto_kg, medio, notas) VALUES (?,?,?,?,?,?)`
+        : `INSERT INTO cc_movimientos (fecha, proveedor, monto, medio, notas) VALUES (?,?,?,?,?)`)
+        .run(...(conKg ? [fecha, a, cheque.monto, cheque.monto / c.precio_mag] : [fecha, a, cheque.monto]),
           `${cheque.es_electronico ? "ECHEQ" : "CHEQUE"} DE TERCEROS${cheque.numero ? " " + cheque.numero : ""}`,
           `Endoso de ${refCheque}${quien ? ` recibido de ${quien}` : ""}`);
       idCC = rcc.lastInsertRowid;
@@ -311,7 +372,7 @@ function endosar(db, ref, datos = {}, ctx = {}) {
     kg_carne: cheque.kg_carne || null,
     mensaje: [
       `🔁 Cheque #${cheque.id} endosado a ${a} · ${fecha}`,
-      `${fmt(cheque.monto)} ${c.moneda} — se registró el cobro y el pago en el mismo acto, así que la caja no se mueve.`,
+      `${fmt(cheque.monto)} ${c.moneda}${enKg(cheque.monto, c.precio_mag)} — se registró el cobro y el pago en el mismo acto, así que la caja no se mueve.`,
       `  Cobro: ${conceptoCobro}${quien ? ` (${quien})` : ""}`,
       `  Pago:  ${conceptoPago} (${a})`,
       esCC ? `Le descontamos la deuda a ${a}.${saldo != null ? ` Saldo: ${fmt(saldo)} ${c.moneda}` : ""}` : null,

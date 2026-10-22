@@ -699,17 +699,7 @@ let data = { transacciones:[], cuentas:[], cheques:[], inversores:[], resumen:{}
 const fmt  = n => '$' + parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmt2 = n => '$' + parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 // Formato kg carne (unidad primaria de VIDELA): con 1 decimal
-
-// Movimientos que salen de caja pero NO son gasto del negocio: distribución de
-// resultado y capital. Sumarlos infla el costo del ejercicio.
-const NO_OPERATIVOS = ['DIVIDENDOS','RETIRO SOCIOS','RETIRO DE SOCIOS',
-                       'APORTE SOCIOS','APORTE DE SOCIOS','DISTRIBUCION UTILIDADES'];
-const esOperativo = c => !NO_OPERATIVOS.includes(String(c||'').toUpperCase().trim());
-const fmtKg = n => {
-  const v = parseFloat(n);
-  if (!Number.isFinite(v)) return '— kg';
-  return v.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' kg';
-};
+const fmtKg = n => parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' kg';
 const fmt1 = n => parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1});
 
 let currentTab = 'dashboard';
@@ -1165,28 +1155,28 @@ function renderDashboard(area) {
         <div class="kcard-glow" style="background:${netoMesKg>=0?'rgba(90,125,58,.3)':'rgba(166,58,46,.3)'}"></div>
         <div class="kl">Neto del mes</div>
         <div class="kv ${netoMesKg>=0?'g':'r'}">${netoMesKg>=0?'+':''}${fmtKg(netoMesKg)}</div>
-        <div class="ks">${nomMes} · ${fmt(Math.abs(netoMes))} ARS</div>
+        <div class="ks">${nomMes} · $${fmt(Math.abs(netoMes))} ARS</div>
       </div>
       <div class="kcard neg">
         <div class="kcard-line r"></div>
         <div class="kcard-glow" style="background:rgba(166,58,46,.2)"></div>
         <div class="kl">Egresos mes</div>
         <div class="kv r">${fmtKg(egMesKg)}</div>
-        <div class="kdelta bad">${diffEgKg>0?'▲':'▼'} ${Math.abs(pctEg)}% vs ant. · ${fmt(egMes)} ARS</div>
+        <div class="kdelta bad">${diffEgKg>0?'▲':'▼'} ${Math.abs(pctEg)}% vs ant. · $${fmt(egMes)} ARS</div>
       </div>
       <div class="kcard ${ingMesKg>0?'pos':''}">
         <div class="kcard-line ${ingMesKg>0?'g':'b'}"></div>
         <div class="kcard-glow" style="background:rgba(196,146,58,.2)"></div>
         <div class="kl">Ingresos mes</div>
         <div class="kv g">${fmtKg(ingMesKg)}</div>
-        <div class="ks">${txMes.filter(t=>t.ingreso>0).length} operaciones · ${fmt(ingMes)} ARS</div>
+        <div class="ks">${txMes.filter(t=>t.ingreso>0).length} operaciones · $${fmt(ingMes)} ARS</div>
       </div>
       <div class="kcard gld">
         <div class="kcard-line gd"></div>
         <div class="kcard-glow" style="background:rgba(196,146,58,.25)"></div>
         <div class="kl">Ciclo ${anoLabel}</div>
         <div class="kv gd">${fmtKg(egAnoKg)}</div>
-        <div class="ks">acumulados · ${fmt(egAno)} ARS</div>
+        <div class="ks">acumulados · $${fmt(egAno)} ARS</div>
       </div>
     </div>
 
@@ -1268,16 +1258,8 @@ function renderDashboard(area) {
 
 async function cargarPatrimonio(){
   const panel=document.getElementById('patrimonioPanel'); if(!panel) return;
-  let paso = 'pedir los datos';
   try{
-    const resp = await fetch(`${RAILWAY_URL}/api/patrimonio?t=${Date.now()}`);
-    paso = `leer la respuesta (HTTP ${resp.status})`;
-    const txt = await resp.text();
-    paso = `interpretar la respuesta (HTTP ${resp.status}, ${txt.length} caracteres)`;
-    let d;
-    try { d = JSON.parse(txt); }
-    catch(e){ throw new Error(`el servidor no devolvió datos válidos (HTTP ${resp.status}): ${txt.slice(0,90)}`); }
-    paso = 'armar el panel';
+    const d=await fetch(`${RAILWAY_URL}/api/patrimonio?t=${Date.now()}`).then(r=>r.json());
     const a=d.actual||{}; const hist=d.historial||[];
     // Serie para el gráfico: snapshots históricos + punto "hoy" (actual)
     const serie=hist.map(h=>({label:h.ciclo||h.fecha, total:parseFloat(h.total||0), snap:true}));
@@ -1285,17 +1267,17 @@ async function cargarPatrimonio(){
     const chart=_svgLineaPatrimonio(serie);
     const chip=(lbl,val,col)=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px;flex:1;min-width:110px">
       <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">${lbl}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${col}">${fmtKg(val)}</div></div>`;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${col}">${fmt2(val)}</div></div>`;
     const chipNeg=(lbl,val)=>`<div style="background:rgba(184,50,50,.05);border:1px solid rgba(184,50,50,.18);border-radius:10px;padding:8px 12px;flex:1;min-width:110px">
       <div style="font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em">${lbl}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">−${fmtKg(val)}</div></div>`;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">−${fmt2(val)}</div></div>`;
     panel.innerHTML=`
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         <div class="d3-panel-hdr" style="margin:0"><span class="d3-panel-ttl">Evolución del patrimonio</span><span class="d3-pill">activos − pasivos · kg</span></div>
         <button onclick="capturarPatrimonio()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer">📸 Capturar hoy</button>
       </div>
-      <div style="font-family:'Fraunces',serif;font-style:italic;font-size:30px;font-weight:300;color:var(--blue);line-height:1;margin-bottom:2px">${fmtKg(a.total)}</div>
-      <div style="font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-bottom:14px">patrimonio neto hoy · activos ${fmtKg(a.activos)} − deudas ${fmtKg(a.pasivos)}${a.ars&&a.ars.total?` · ${fmt(a.ars.total)} ARS`:``}</div>
+      <div style="font-family:'Fraunces',serif;font-style:italic;font-size:30px;font-weight:300;color:var(--blue);line-height:1;margin-bottom:2px">${fmt2(a.total)}</div>
+      <div style="font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-bottom:14px">patrimonio neto hoy · activos ${fmt2(a.activos)} − deudas ${fmt2(a.pasivos)}</div>
       <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Activos</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         ${chip('Caja (flujo)',a.caja,a.caja>=0?'var(--green)':'var(--red)')}
@@ -1312,16 +1294,9 @@ async function cargarPatrimonio(){
       </div>
       ${chart}
       ${hist.length===0?`<div style="font-size:11px;color:var(--muted2);margin-top:10px;text-align:center">Todavía no hay fotos guardadas. Tocá <b>📸 Capturar hoy</b> al cierre de cada ciclo para ir armando la historia.</div>`:''}`;
-  }catch(e){
-    console.error('patrimonio:', e);
-    panel.innerHTML=`<div style="text-align:center;color:var(--red);padding:20px;font-size:12px">
-      No pude cargar el patrimonio al <b>${paso}</b>.<br>${e.message}</div>`;
-  }
+  }catch(e){ panel.innerHTML=`<div style="text-align:center;color:var(--red);padding:20px;font-size:12px">No pude cargar el patrimonio. ${e.message}</div>`; }
 }
 function _svgLineaPatrimonio(serie){
-  // Sin esto, un total nulo o NaN genera coordenadas inválidas y el navegador
-  // rechaza el SVG entero con "The string did not match the expected pattern".
-  serie = (serie||[]).map(p=>({...p, total: Number.isFinite(+p.total) ? +p.total : 0}));
   if(!serie.length) return '';
   const W=600,H=210,pad=44,padB=34,padT=16;
   const vals=serie.map(p=>p.total);
@@ -1360,8 +1335,8 @@ function renderMovimientos(area) {
     <div class="dash-card full">
       <h3>Últimos movimientos <span style="font-size:11px;color:var(--muted);font-weight:400">(últimos ${txs.length})</span></h3>
       <div style="display:flex;gap:20px;margin-bottom:12px;font-size:12px;color:var(--muted)">
-        <span>📤 Egresos: <b style="color:var(--red)">${fmtKg(totalEgKg)}</b> · ${fmt(totalEg)} ARS</span>
-        <span>📥 Ingresos: <b style="color:var(--green)">${fmtKg(totalIngKg)}</b> · ${fmt(totalIng)} ARS</span>
+        <span>📤 Egresos: <b style="color:var(--red)">${fmtKg(totalEgKg)}</b> · $${fmt(totalEg)} ARS</span>
+        <span>📥 Ingresos: <b style="color:var(--green)">${fmtKg(totalIngKg)}</b> · $${fmt(totalIng)} ARS</span>
         <span>💰 Neto: <b style="color:${totalIngKg-totalEgKg>=0?'var(--green)':'var(--red)'}">${fmtKg(totalIngKg-totalEgKg)}</b></span>
       </div>
       ${txs.length ? `<table class="data-table">
@@ -1403,7 +1378,7 @@ function renderCuentas(area) {
         <div class="kpi-card" style="margin:0;background:rgba(166,58,46,.06);border-color:rgba(166,58,46,.2)">
           <div class="kpi-label">Total adeudado</div>
           <div class="kpi-value neg">${fmtKg(totalDeudaKg)}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmt(totalDeudaArs)} ARS</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">$${fmt(totalDeudaArs)} ARS</div>
         </div>
         <div class="kpi-card" style="margin:0">
           <div class="kpi-label">Todos los proveedores</div>
@@ -1568,54 +1543,184 @@ function descargarCSV(rows, filename) {
 }
 
 
+// Un cheque está en mano mientras no se cobró, no se endosó y no rebotó. Los
+// que se cargaron con el sistema viejo quedaron en PENDIENTE: es lo mismo.
+const CH_EN_MANO = ['EN_CARTERA','PENDIENTE'];
+const chEnMano = c => CH_EN_MANO.includes(c.estado);
+const chTexto = e => ({EN_CARTERA:'en cartera',PENDIENTE:'en cartera',COBRADO:'cobrado',DEPOSITADO:'depositado',ENDOSADO:'endosado',RECHAZADO:'rechazado'}[e] || e || '—');
+const chColor = e => CH_EN_MANO.includes(e) ? 'gold' : e === 'RECHAZADO' ? 'red' : 'green';
+const chBtn = (txt, fn, color) => `<button onclick="${fn}" style="background:${color};color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:600;font-family:'Archivo',sans-serif;cursor:pointer;white-space:nowrap">${txt}</button>`;
+
 function renderCheques(area) {
-  const pend = data.cheques.filter(c=>c.estado==='PENDIENTE');
+  const hoy = new Date().toISOString().slice(0,10);
   const todos = data.cheques;
-  // Totales en kg carne (unidad principal) y ARS (referencia)
-  const totalEmitKg = pend.filter(c=>c.tipo==='EMITIDO').reduce((s,c)=>s+parseFloat(c.monto_kg||0),0);
-  const totalRecibKg = pend.filter(c=>c.tipo==='RECIBIDO').reduce((s,c)=>s+parseFloat(c.monto_kg||0),0);
-  const totalEmit = pend.filter(c=>c.tipo==='EMITIDO').reduce((s,c)=>s+parseFloat(c.monto||0),0);
-  const totalRecib = pend.filter(c=>c.tipo==='RECIBIDO').reduce((s,c)=>s+parseFloat(c.monto||0),0);
+  const cartera = todos.filter(c => c.tipo === 'RECIBIDO' && chEnMano(c))
+    .sort((a,b) => String(a.fecha_cobro||'9999').localeCompare(String(b.fecha_cobro||'9999')));
+  const propios = todos.filter(c => c.tipo === 'EMITIDO' && chEnMano(c));
+  const totalCartera = cartera.reduce((s,c) => s + parseFloat(c.monto||0), 0);
+  const totalCarteraKg = cartera.reduce((s,c) => s + parseFloat(c.monto_kg||0), 0);
+  const vencidos = cartera.filter(c => c.fecha_cobro && c.fecha_cobro < hoy);
+  const totalVencido = vencidos.reduce((s,c) => s + parseFloat(c.monto||0), 0);
+  const totalPropios = propios.reduce((s,c) => s + parseFloat(c.monto||0), 0);
+  const kgPend = cartera.reduce((s,c) => s + parseFloat(c.kg_carne||0), 0);
+
+  const fila = c => {
+    const venc = c.fecha_cobro && c.fecha_cobro < hoy;
+    return `
+      <div class="cheque-row" style="${venc ? 'background:rgba(184,50,50,.045)' : ''}">
+        <div class="cheque-tipo recib">📥</div>
+        <div style="flex:1;min-width:0">
+          <div>${c.recibido_de || c.proveedor || 'Sin nombre'}
+            ${c.numero ? `<span class="tag">${c.es_electronico ? 'e-cheq' : 'cheque'} ${c.numero}</span>` : ''}</div>
+          <div style="color:var(--muted);font-size:10px">
+            ${c.fecha_cobro ? (venc ? 'VENCIÓ el ' : 'Vence ') + c.fecha_cobro : 'sin vencimiento'}${c.banco ? ' · ' + c.banco : ''}${c.kg_carne ? ' · ' + fmt(c.kg_carne) + ' kg' : ''}${c.librador && c.librador !== c.recibido_de ? ' · libra ' + c.librador : ''}
+          </div>
+        </div>
+        <div style="margin-right:10px;white-space:nowrap;text-align:right">
+          <div class="pos">${fmt2(c.monto)}</div>
+          ${c.monto_kg ? `<div style="font-size:10px;color:var(--muted)">${fmt(c.monto_kg)} kg</div>` : ''}
+        </div>
+        <div style="display:flex;gap:4px">
+          ${chBtn('Cobrar',  'chCobrar('  + c.id + ')', 'var(--green)')}
+          ${chBtn('Endosar', 'chEndosar(' + c.id + ')', 'var(--blue)')}
+          ${chBtn('Rebotó',  'chRechazar('+ c.id + ')', 'var(--red)')}
+        </div>
+      </div>`;
+  };
+
   area.innerHTML = `
     <div class="dash-grid">
       <div class="dash-card">
-        <h3>Pendientes de pago/cobro</h3>
-        <div style="display:flex;gap:12px;margin-bottom:14px">
-          <div class="kpi-card" style="flex:1;margin:0"><div class="kpi-label">A pagar</div><div class="kpi-value neg">${fmtKg(totalEmitKg)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${fmt(totalEmit)} ARS</div></div>
-          <div class="kpi-card green" style="flex:1;margin:0"><div class="kpi-label">A cobrar</div><div class="kpi-value pos">${fmtKg(totalRecibKg)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${fmt(totalRecib)} ARS</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">Cartera de cheques de terceros</h3>
+          <button onclick="chToggleForm()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">+ Cheque recibido</button>
         </div>
-        ${pend.length ? pend.map(c=>`
-          <div class="cheque-row">
-            <div class="cheque-tipo ${c.tipo==='EMITIDO'?'emit':'recib'}">${c.tipo==='EMITIDO'?'📤':'📥'}</div>
-            <div style="flex:1">
-              <div>${c.proveedor||'Sin proveedor'}</div>
-              <div style="color:var(--muted);font-size:10px">${c.tipo} · Vence ${c.fecha_cobro||'—'} · ${c.banco||'NACION'}</div>
-            </div>
-            <div style="text-align:right">
-              <div class="${c.tipo==='EMITIDO'?'neg':'pos'}" style="font-family:'JetBrains Mono',monospace;font-weight:700">${fmtKg(c.monto_kg||0)}</div>
-              <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace">${fmt(c.monto)}</div>
-            </div>
-          </div>`).join('') : '<div class="empty-dash">Sin cheques pendientes</div>'}
+
+        <div id="ch-form" style="display:none;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px">
+            <label style="font-size:10px;color:var(--muted)">Monto<input id="ch-monto" type="number" step="0.01" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+            <label style="font-size:10px;color:var(--muted)">Quién lo dio<input id="ch-de" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+            <label style="font-size:10px;color:var(--muted)">N° de cheque<input id="ch-numero" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+            <label style="font-size:10px;color:var(--muted)">Vence<input id="ch-vence" type="date" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+            <label style="font-size:10px;color:var(--muted)">Banco<input id="ch-banco" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+            <label style="font-size:10px;color:var(--muted)">Kg de carne<input id="ch-kg" type="number" step="0.1" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px"></label>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px">
+            <label style="font-size:11px;color:var(--muted2)"><input id="ch-echeq" type="checkbox" checked> es electrónico (e-cheq)</label>
+            <button onclick="chRecibir()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer">Guardar en cartera</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:9px;line-height:1.5">
+            Mientras está en cartera no mueve el flujo. Entra cuando lo cobrás por banco, o cuando lo endosás para pagar algo: ahí se registra el cobro y el pago en el mismo acto y la caja no se mueve.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="kpi-card green" style="flex:1;margin:0;min-width:120px"><div class="kpi-label">En cartera</div><div class="kpi-value pos">${fmt(totalCartera)}</div><div style="font-size:10px;color:var(--muted)">${cartera.length} cheque${cartera.length===1?'':'s'}${totalCarteraKg ? ' · ' + fmt(totalCarteraKg) + ' kg' : ''}</div></div>
+          <div class="kpi-card" style="flex:1;margin:0;min-width:120px"><div class="kpi-label">Vencidos sin cobrar</div><div class="kpi-value ${totalVencido?'neg':''}">${fmt(totalVencido)}</div><div style="font-size:10px;color:var(--muted)">${vencidos.length} cheque${vencidos.length===1?'':'s'}</div></div>
+          <div class="kpi-card" style="flex:1;margin:0;min-width:120px"><div class="kpi-label">Propios a pagar</div><div class="kpi-value neg">${fmt(totalPropios)}</div><div style="font-size:10px;color:var(--muted)">${propios.length} cheque${propios.length===1?'':'s'}</div></div>
+          ${kgPend ? `<div class="kpi-card" style="flex:1;margin:0;min-width:120px"><div class="kpi-label">Kg sin reconocer</div><div class="kpi-value">${fmt(kgPend)}</div><div style="font-size:10px;color:var(--muted)">se reconocen al cobrar</div></div>` : ''}
+        </div>
+
+        ${vencidos.length ? `<div style="font-size:11px;font-weight:700;color:var(--red);margin:0 16px 6px">VENCIDOS SIN COBRAR</div>${vencidos.map(fila).join('')}` : ''}
+        ${cartera.filter(c => !(c.fecha_cobro && c.fecha_cobro < hoy)).length
+          ? `${vencidos.length ? '<div style="font-size:11px;font-weight:700;color:var(--muted2);margin:14px 16px 6px">POR VENCER</div>' : ''}${cartera.filter(c => !(c.fecha_cobro && c.fecha_cobro < hoy)).map(fila).join('')}`
+          : (vencidos.length ? '' : '<div class="empty-dash">No hay cheques de terceros en cartera</div>')}
       </div>
+
+      ${propios.length ? `
+      <div class="dash-card">
+        <h3>Cheques propios pendientes de pago</h3>
+        ${propios.map(c => `
+          <div class="cheque-row">
+            <div class="cheque-tipo emit">📤</div>
+            <div style="flex:1">
+              <div>${c.proveedor || 'Sin proveedor'}${c.numero ? ` <span class="tag">${c.numero}</span>` : ''}</div>
+              <div style="color:var(--muted);font-size:10px">Vence ${c.fecha_cobro || '—'} · ${c.banco || '—'}</div>
+            </div>
+            <div class="neg" style="margin-right:10px">${fmt2(c.monto)}</div>
+            ${chBtn('Pagado', 'chMarcarCobrado(' + c.id + ')', 'var(--green)')}
+          </div>`).join('')}
+      </div>` : ''}
+
       <div class="dash-card">
         <h3>Historial completo</h3>
         <table class="data-table">
-          <thead><tr><th>Tipo</th><th>Proveedor</th><th style="text-align:right">Monto kg</th><th style="text-align:right;font-size:10px">ARS</th><th>Vence</th><th>Estado</th></tr></thead>
+          <thead><tr><th></th><th>N°</th><th>De / Para</th><th>Monto</th><th>Vence</th><th>Estado</th><th>Destino</th></tr></thead>
           <tbody>
-            ${todos.map(c=>`<tr>
-              <td>${c.tipo==='EMITIDO'?'📤':'📥'} ${c.tipo}</td>
-              <td>${c.proveedor||'—'}</td>
-              <td class="${c.tipo==='EMITIDO'?'neg':'pos'}" style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700">${fmtKg(c.monto_kg||0)}</td>
-              <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">${fmt(c.monto)}</td>
-              <td>${c.fecha_cobro||'—'}</td>
-              <td><span class="tag ${c.estado==='PENDIENTE'?'gold':'green'}">${c.estado}</span></td>
-            </tr>`).join('')}
+            ${todos.length ? todos.map(c => `<tr>
+              <td>${c.tipo === 'EMITIDO' ? '📤' : '📥'}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${c.numero || '—'}</td>
+              <td>${c.recibido_de || c.proveedor || '—'}</td>
+              <td class="${c.tipo === 'EMITIDO' ? 'neg' : 'pos'}">${fmt2(c.monto)}</td>
+              <td>${c.fecha_cobro || '—'}</td>
+              <td><span class="tag ${chColor(c.estado)}">${chTexto(c.estado)}</span></td>
+              <td style="font-size:11px;color:var(--muted)">${c.entregado_a ? '→ ' + c.entregado_a : c.estado === 'RECHAZADO' && c.motivo_rechazo ? c.motivo_rechazo : c.fecha_acreditacion ? 'acreditado ' + c.fecha_acreditacion : '—'}</td>
+            </tr>`).join('') : '<tr><td colspan="7" style="color:var(--muted)">Sin cheques cargados</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>`;
 }
 
+function chToggleForm() {
+  const f = document.getElementById('ch-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+// Todas las operaciones van por la misma puerta que usa el bot, así que la
+// pantalla y el WhatsApp hacen exactamente lo mismo.
+async function chAccion(accion, aviso) {
+  const r = await fetch(`${RAILWAY_URL}/api/ejecutar-accion`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ accion }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) { alert('No se pudo: ' + (d.error || ('HTTP ' + r.status))); return false; }
+  if (d.respuesta && String(d.respuesta).trim().startsWith('❌')) { alert(String(d.respuesta).replace('❌','').trim()); return false; }
+  if (aviso !== false) alert(d.respuesta || 'Listo.');
+  await loadAll(); renderTab('cheques');
+  return true;
+}
+
+async function chRecibir() {
+  const monto = parseFloat(document.getElementById('ch-monto').value) || 0;
+  const de = document.getElementById('ch-de').value.trim();
+  if (!monto) { alert('Poné el monto del cheque.'); return; }
+  await chAccion({
+    accion: 'recibir_cheque', monto,
+    recibido_de: de,
+    numero: document.getElementById('ch-numero').value.trim() || undefined,
+    fecha_cobro: document.getElementById('ch-vence').value || undefined,
+    banco: document.getElementById('ch-banco').value.trim() || undefined,
+    kg_carne: parseFloat(document.getElementById('ch-kg').value) || undefined,
+    es_electronico: document.getElementById('ch-echeq').checked
+  });
+}
+
+function chBuscar(id) { return data.cheques.find(c => String(c.id) === String(id)) || {}; }
+
+async function chCobrar(id) {
+  const c = chBuscar(id);
+  if (!confirm(`¿El banco acreditó este cheque?\n\n${fmt2(c.monto)} de ${c.recibido_de || c.proveedor || '—'}\n\nVa a ENTRAR al flujo como ingreso${c.kg_carne ? ` y se reconocen ${fmt(c.kg_carne)} kg de carne` : ''}.`)) return;
+  await chAccion({ accion: 'cobrar_cheque', cheque: id });
+}
+
+async function chEndosar(id) {
+  const c = chBuscar(id);
+  const a = prompt(`¿A quién le diste este cheque?\n\n${fmt2(c.monto)} de ${c.recibido_de || c.proveedor || '—'}\n\nSe registra el cobro y el pago en el mismo acto: la caja no se mueve. Si tiene cuenta corriente, se le descuenta la deuda.`);
+  if (!a || !a.trim()) return;
+  const concepto = prompt(`¿Qué pagás con esto?\n\nDejalo vacío si ${a.trim()} tiene cuenta corriente: el sistema lo detecta y usa PAGO CUENTA CORRIENTE.\nSi no, poné la categoría del gasto (FLETES, COMBUSTIBLE CAMPO, etc.).`, '');
+  await chAccion({ accion: 'endosar_cheque', cheque: id, entregado_a: a.trim(), concepto_pago: (concepto || '').trim() || undefined });
+}
+
+async function chRechazar(id) {
+  const c = chBuscar(id);
+  const motivo = prompt(`¿Por qué rebotó?\n\n${fmt2(c.monto)} de ${c.recibido_de || c.proveedor || '—'}\n\nSe dan de baja el ingreso y el pago que había generado${c.entregado_a ? `, y la deuda con ${c.entregado_a} vuelve a quedar abierta` : ''}.`, 'sin fondos');
+  if (motivo === null) return;
+  await chAccion({ accion: 'rechazar_cheque', cheque: id, motivo: motivo.trim() || undefined });
+}
+
+async function chMarcarCobrado(id) {
+  if (!confirm('¿Marcar este cheque propio como pagado?')) return;
+  await chAccion({ accion: 'marcar_cheque_cobrado', id: Number(id) });
+}
 function renderInversores(area) {
   const activos = data.inversores.filter(i=>i.estado==='ACTIVO');
   const totalDeuda = activos.reduce((s,i)=>s+parseFloat(i.deuda_calculada||i.deuda_actual||0),0);
@@ -1629,7 +1734,7 @@ function renderInversores(area) {
           <button onclick="abrirNuevoInversor()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">+ Nuevo inversor</button>
         </div>
         <div style="display:flex;gap:12px;margin-bottom:16px">
-          <div class="kpi-card" style="flex:1;margin:0"><div class="kpi-label">Capital total</div><div class="kpi-value">${fmtKg(totalCapitalKg)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${fmt(totalCapital)} ARS</div></div>
+          <div class="kpi-card" style="flex:1;margin:0"><div class="kpi-label">Capital total</div><div class="kpi-value">${fmtKg(totalCapitalKg)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">$${fmt(totalCapital)} ARS</div></div>
           <div class="kpi-card" style="flex:1;margin:0"><div class="kpi-label">Deuda total ARS (ref)</div><div class="kpi-value neg">${fmt(totalDeuda)}</div></div>
         </div>
         ${activos.length===0?'<div style="color:var(--muted2);font-size:13px;padding:8px">No hay inversores activos. Cargá uno con "+ Nuevo inversor".</div>':''}
@@ -1640,12 +1745,12 @@ function renderInversores(area) {
           const pct = capital > 0 ? Math.min((deuda/capital*100),100) : 0;
           return `<div class="inv-card">
             <div class="inv-name">${i.inversor}</div>
-            <div class="inv-row"><span class="inv-label">Capital</span><span class="inv-val">${fmtKg(capitalKg)} · ${fmt(capital)}</span></div>
+            <div class="inv-row"><span class="inv-label">Capital</span><span class="inv-val">${fmtKg(capitalKg)} · $${fmt(capital)}</span></div>
             <div class="inv-row"><span class="inv-label">Tasa anual (sobre kg)</span><span class="inv-val">${(parseFloat(i.tasa||0)*100).toFixed(1)}%</span></div>
             <div class="inv-row"><span class="inv-label">Fecha ingreso</span><span class="inv-val">${i.fecha_ingreso||'—'}</span></div>
-            <div class="inv-deuda">Deuda ARS: ${fmt(deuda)}</div>
+            <div class="inv-deuda">Deuda ARS: $${fmt(deuda)}</div>
             <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-            <button onclick="pagarInversor('${(i.inversor||'').replace(/'/g,"\\'")}',${deuda.toFixed(2)})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;margin-top:10px;width:100%">💵 Pagar y cerrar (sale ${fmt(deuda)})</button>
+            <button onclick="pagarInversor('${(i.inversor||'').replace(/'/g,"\\'")}',${deuda.toFixed(2)})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;margin-top:10px;width:100%">💵 Pagar y cerrar (sale $${fmt(deuda)})</button>
           </div>`;
         }).join('')}
       </div>
@@ -1830,7 +1935,7 @@ FECHA HOY: ${new Date().toISOString().slice(0,10)}
 DATOS ACTUALES:
 Transacciones recientes: ${JSON.stringify(data.transacciones.slice(0,30).map(t=>({id:t.id,fecha:t.fecha,concepto:t.concepto,detalle:t.detalle,egreso:t.egreso,egreso_kg:t.egreso_kg,ingreso:t.ingreso,ingreso_kg:t.ingreso_kg,proveedor:t.proveedor})))}
 Cuentas corrientes: ${JSON.stringify(data.cuentas.map(c=>({proveedor:c.proveedor,saldo:parseFloat(c.saldo||0).toFixed(2)})))}
-Cheques pendientes: ${JSON.stringify(data.cheques.filter(c=>c.estado==='PENDIENTE').map(c=>({id:c.id,tipo:c.tipo,proveedor:c.proveedor,monto:c.monto,monto_kg:c.monto_kg,vence:c.fecha_cobro})))}
+Cheques pendientes: ${JSON.stringify(data.cheques.filter(chEnMano).map(c=>({id:c.id,tipo:c.tipo,numero:c.numero,de:c.recibido_de||c.proveedor,monto:c.monto,monto_kg:c.monto_kg,vence:c.fecha_cobro})))}
 Inversores: ${JSON.stringify(data.inversores.map(i=>({inversor:i.inversor,capital:i.capital,capital_kg:i.capital_kg,tasa:i.tasa,deuda:parseFloat(i.deuda_calculada||i.deuda_actual||0).toFixed(2),estado:i.estado})))}
 Resumen mes: ${JSON.stringify(data.resumen)}
 
@@ -1951,10 +2056,7 @@ function renderFlujos(area) {
 
   // Categorías (en kg carne)
   const porCat = {};
-  let retiros = 0;
   tx.forEach(t => {
-    // Los retiros de socios salen de caja pero no son gasto: van aparte.
-    if (!esOperativo(t.concepto)) { retiros += parseFloat(t.egreso_kg||0); return; }
     if (!porCat[t.concepto]) porCat[t.concepto] = { egreso: 0, ingreso: 0 };
     porCat[t.concepto].egreso += parseFloat(t.egreso_kg||0);
     porCat[t.concepto].ingreso += parseFloat(t.ingreso_kg||0);
@@ -2106,8 +2208,6 @@ function renderFlujos(area) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="dash-card" style="padding:16px">
           <div style="font-size:12px;font-weight:600;margin-bottom:12px">Top egresos por categoría</div>
-          ${retiros > 0 ? `<div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">
-            Además se retiraron ${fmtKg(retiros)} en dividendos — no cuentan como gasto del negocio.</div>` : ''}
           <div class="bar-chart">
             ${cats.filter(([,v]) => v.egreso > 0).slice(0,10).map(([cat,v]) => `
               <div class="bar-row">
@@ -2881,7 +2981,7 @@ fetchTC();
   addMsg('bot',`¡Buenas! Sistema <strong>Cabaña Amakaik</strong> cargado.<br><br>
     📊 <strong>${data.transacciones.length}</strong> movimientos históricos<br>
     🔄 <strong>${data.cuentas.filter(c=>parseFloat(c.saldo||0)!==0).length}</strong> cuentas corrientes con saldo<br>
-    🏦 <strong>${data.cheques.filter(c=>c.estado==='PENDIENTE').length}</strong> cheques pendientes<br>
+    🏦 <strong>${data.cheques.filter(chEnMano).length}</strong> cheques pendientes<br>
     👥 <strong>${data.inversores.filter(i=>i.estado==='ACTIVO').length}</strong> inversores activos<br><br>
     Registrá por WhatsApp con <strong>IMP</strong>. Consultá acá.`);
 })();
@@ -3127,7 +3227,7 @@ async function sincronizarGanadoADE(){
   const cont=document.getElementById('ganadoContent');
   if(cont) cont.insertAdjacentHTML('afterbegin','<div id="syncMsg" style="text-align:center;color:var(--blue);font-size:12px;padding:6px">🔄 Conectando con Angus del Este…</div>');
   try{
-    const r=await fetch(`${RAILWAY_URL}/api/ganado/sync-ade`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campo: window.CAMPO})});
+    const r=await fetch(`${RAILWAY_URL}/api/ganado/sync-ade`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok||d.error){ alert('No se pudo sincronizar: '+(d.error||('HTTP '+r.status))); cargarGanado(); return; }
     if((d.actualizados+d.creados)===0){ alert('ADE respondió pero no trajo categorías. '+(d.mensaje||'')); }
@@ -3274,8 +3374,8 @@ function _reempHint(valorLibro){
   const venta=parseFloat(document.getElementById('rv-venta').value)||0;
   const perd=Math.round((valorLibro-venta)*100)/100;
   const el=document.getElementById('rv-perdida-hint');
-  if(perd>0.01) el.innerHTML=`<span style="color:var(--red);font-weight:700">Pérdida por venta: ${fmt2(perd)}</span> <span style="color:var(--muted2)">(libro ${fmt2(valorLibro)} − venta ${fmt2(venta)}) → va a gasto</span>`;
-  else if(perd<-0.01) el.innerHTML=`<span style="color:var(--green);font-weight:700">Ganancia por venta: ${fmt2(Math.abs(perd))}</span> <span style="color:var(--muted2)">(venta ${fmt2(venta)} − libro ${fmt2(valorLibro)}) → va a ingreso</span>`;
+  if(perd>0.01) el.innerHTML=`<span style="color:var(--red);font-weight:700">Pérdida por venta: $${fmt2(perd)}</span> <span style="color:var(--muted2)">(libro $${fmt2(valorLibro)} − venta $${fmt2(venta)}) → va a gasto</span>`;
+  else if(perd<-0.01) el.innerHTML=`<span style="color:var(--green);font-weight:700">Ganancia por venta: $${fmt2(Math.abs(perd))}</span> <span style="color:var(--muted2)">(venta $${fmt2(venta)} − libro $${fmt2(valorLibro)}) → va a ingreso</span>`;
   else el.innerHTML=`<span style="color:var(--muted2)">Venta = valor de libro: sin pérdida ni ganancia.</span>`;
 }
 function reemplazarBien(b){
@@ -3315,8 +3415,8 @@ async function guardarReemplazo(viejoId,valorLibro){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.error){ alert('No se pudo: '+(d.error||('HTTP '+r.status))); return; }
   let msg=`✅ Reemplazo hecho.\n"${nuevo.nombre}" dado de alta.`;
-  if(d.resultado==='perdida') msg+=`\n\nPérdida real por la venta: ${fmt2(d.perdida)} (registrada como gasto).`;
-  else if(d.resultado==='ganancia') msg+=`\n\nGanancia por la venta: ${fmt2(Math.abs(d.perdida))} (registrada como ingreso).`;
+  if(d.resultado==='perdida') msg+=`\n\nPérdida real por la venta: $${fmt2(d.perdida)} (registrada como gasto).`;
+  else if(d.resultado==='ganancia') msg+=`\n\nGanancia por la venta: $${fmt2(Math.abs(d.perdida))} (registrada como ingreso).`;
   else msg+=`\n\nSin pérdida ni ganancia (venta = valor de libro).`;
   alert(msg);
   _otClose('modalReemp');
@@ -3328,7 +3428,7 @@ async function amortizarCiclo(ciclo){
   const r=await fetch(`${RAILWAY_URL}/api/bienes/amortizar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ciclo})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.error){ alert('No se pudo: '+(d.error||('HTTP '+r.status))); return; }
-  if(d.creados>0){ alert(`✅ Registrado 1 item de depreciación por ${fmt2(d.total)} kg (${d.creados} bien${d.creados>1?'es':''}) como gasto del ciclo ${ciclo}.`); }
+  if(d.creados>0){ alert(`✅ Registrado 1 item de depreciación por $${fmt2(d.total)} kg (${d.creados} bien${d.creados>1?'es':''}) como gasto del ciclo ${ciclo}.`); }
   else { alert(`El ciclo ${ciclo} ya estaba registrado (${d.ya_existentes} bien/es) o no hay bienes a depreciar. No se duplicó nada.`); }
   if(typeof loadAll==='function') await loadAll();
   cargarBienes();
@@ -4033,7 +4133,7 @@ function _prodCalc(){
   const totCosto=env*pr;
   const cu=totCant>0?totCosto/totCant:0;
   const el=document.getElementById('pr-resumen'); if(!el) return;
-  el.innerHTML=`<b style="color:var(--blue)">${totCant.toLocaleString('es-AR')} ${un}</b> en stock`+(totCosto>0?` · valor <b style="color:var(--green)">${fmt2(totCosto)}</b> · <span style="color:var(--muted)">$${Math.round(cu*10000)/10000}/${un}</span>`:'');
+  el.innerHTML=`<b style="color:var(--blue)">${totCant.toLocaleString('es-AR')} ${un}</b> en stock`+(totCosto>0?` · valor <b style="color:var(--green)">$${fmt2(totCosto)}</b> · <span style="color:var(--muted)">$${Math.round(cu*10000)/10000}/${un}</span>`:'');
 }
 
 // ── COMPRA DE INSUMO (egreso + entrada de stock) ──────────────────────────────
@@ -4047,7 +4147,7 @@ function _compraCalc(){
   const cu=totCant>0?totCosto/totCant:0;
   document.getElementById('co-resumen').innerHTML=
     `<span style="color:var(--blue);font-weight:700">${totCant.toLocaleString('es-AR')} ${un}</span> al stock · `+
-    `<span style="color:var(--red);font-weight:700">${fmt2(totCosto)}</span> al flujo`+
+    `<span style="color:var(--red);font-weight:700">$${fmt2(totCosto)}</span> al flujo`+
     (totCant>0?` · <span style="color:var(--muted)">$${(Math.round(cu*10000)/10000)}/${un}</span>`:'');
 }
 function abrirCompraInsumo(){
@@ -4098,7 +4198,7 @@ async function guardarCompraInsumo(){
   const r=await fetch(`${RAILWAY_URL}/api/stock/compra`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.error){ alert('No se pudo: '+(d.error||('HTTP '+r.status))); return; }
-  alert(`✅ Compra registrada.\n${d.producto}: +${fmt2(d.cantidad_total)} ${d.unidad} al stock.\nEgreso ${fmt2(d.costo_total)} (${d.concepto}) al flujo.\nCosto: $${d.precio_unitario}/${d.unidad}.`);
+  alert(`✅ Compra registrada.\n${d.producto}: +${fmt2(d.cantidad_total)} ${d.unidad} al stock.\nEgreso $${fmt2(d.costo_total)} (${d.concepto}) al flujo.\nCosto: $${d.precio_unitario}/${d.unidad}.`);
   _otClose('modalCompra'); await loadAll();
 }
 
