@@ -6,8 +6,8 @@ const PDFDocument = require("pdfkit");
 const path = require("path");
 const fs = require("fs");
 
-// Eventos del campo (lluvias, heladas, trabajos). Si faltara el archivo, el
-// server tiene que levantar igual, así que va envuelto.
+// Cheques de terceros y eventos del campo. Si faltara alguno, el server tiene
+// que levantar igual, así que van envueltos.
 let cheques = null;
 try { cheques = require("./cheques.js"); }
 catch (e) { console.log("⚠️  cheques.js no disponible:", e.message); }
@@ -38,6 +38,14 @@ app.get("/videla", (req, res) => res.sendFile(path.join(__dirname, "index.html")
 app.get("/finanzas", (req, res) => res.sendFile(path.join(__dirname, "index.html")));  // alias
 app.get("/ade", (req, res) => res.redirect("https://jjdastolfo-ui.github.io/angus-del-este/ADE_v4.html?campo=angus_la_posta"));
 app.get("/ganaderia", (req, res) => res.redirect("https://jjdastolfo-ui.github.io/angus-del-este/ADE_v4.html?campo=angus_la_posta"));  // alias
+
+
+// ── CONCEPTOS NO OPERATIVOS ──────────────────────────────────────────────────
+// Movimientos que afectan la caja pero NO son gasto del negocio.
+const NO_OPERATIVOS = ['DIVIDENDOS', 'RETIRO SOCIOS', 'RETIRO DE SOCIOS',
+                       'APORTE SOCIOS', 'APORTE DE SOCIOS', 'DISTRIBUCION UTILIDADES'];
+const SQL_NO_OPERATIVOS = NO_OPERATIVOS.map(c => `'${c}'`).join(',');
+const FILTRO_OPERATIVO = `upper(COALESCE(concepto,'')) NOT IN (${SQL_NO_OPERATIVOS})`;
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -508,9 +516,9 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS diario_campo (
   detalle TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 )`); } catch(e) {}
-// Índices del diario, y la tabla por si alguna base todavía no la tiene.
 // La cartera de cheques: columnas nuevas sobre la tabla cheques que ya existe.
 try { if (cheques) cheques.init(db); } catch (e) { console.log("⚠️  cheques.init:", e.message); }
+// Índices del diario, y la tabla por si alguna base todavía no la tiene.
 try { if (eventos) eventos.init(db, "AMAKAIK"); } catch (e) { console.log("⚠️  eventos.init:", e.message); }
 try { db.exec(`CREATE TABLE IF NOT EXISTS tareas_campo (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1858,9 +1866,9 @@ function getResumenCuentasCorrientes() {
 function getDetalleCuentasParaBot() {
   const proveedores = db.prepare("SELECT proveedor FROM cuentas_corrientes ORDER BY proveedor").all();
   return proveedores.map(p => {
-    const compras = db.prepare(`SELECT COALESCE(SUM(egreso),0) t FROM transacciones
+    const compras = db.prepare(`SELECT COALESCE(SUM(egreso_kg),0) t, COALESCE(SUM(egreso),0) t_ars FROM transacciones
       WHERE LOWER(proveedor) = LOWER(?) AND concepto != 'PAGO CUENTA CORRIENTE'`).get(p.proveedor).t;
-    const pagos = db.prepare(`SELECT COALESCE(SUM(monto),0) t, COUNT(*) n, MAX(fecha) ult
+    const pagos = db.prepare(`SELECT COALESCE(SUM(monto_kg),0) t, COALESCE(SUM(monto),0) t_ars, COUNT(*) n, MAX(fecha) ult
       FROM cc_movimientos WHERE LOWER(proveedor) = LOWER(?)`).get(p.proveedor);
     return { proveedor: p.proveedor,
       compras: Math.round(compras * 100) / 100,
@@ -1931,17 +1939,22 @@ function getInformeCiclo(cicloStr, tipo = 'productivo') {
   const fechaHasta = ciclo.fecha_hasta < hoy ? ciclo.fecha_hasta : hoy;
 
   const rows = db.prepare(`
-    SELECT concepto, 
-           SUM(egreso) as total_egreso, 
-           SUM(ingreso) as total_ingreso,
+    SELECT concepto,
+           SUM(egreso_kg) as total_egreso,
+           SUM(ingreso_kg) as total_ingreso,
+           SUM(egreso)     as total_egreso_ars,
+           SUM(ingreso)    as total_ingreso_ars,
            COUNT(*) as cant_movimientos
-    FROM transacciones 
-    WHERE fecha >= ? AND fecha <= ?
+    FROM transacciones
+    WHERE fecha >= ? AND fecha <= ? AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total_egreso DESC
   `).all(ciclo.fecha_desde, fechaHasta);
 
+  // En kg (unidad principal) y en ARS de referencia.
   const totalEgresos = rows.reduce((s, r) => s + (r.total_egreso || 0), 0);
   const totalIngresos = rows.reduce((s, r) => s + (r.total_ingreso || 0), 0);
+  const totalEgresosArs = rows.reduce((s, r) => s + (r.total_egreso_ars || 0), 0);
+  const totalIngresosArs = rows.reduce((s, r) => s + (r.total_ingreso_ars || 0), 0);
   const totalMovimientos = rows.reduce((s, r) => s + r.cant_movimientos, 0);
 
   // Presupuestos del ciclo
@@ -1951,17 +1964,19 @@ function getInformeCiclo(cicloStr, tipo = 'productivo') {
   const presupuestoMap = {};
   presupuestos.forEach(p => { presupuestoMap[p.concepto] = p.monto_anual; });
 
-  return { ciclo, rows, totalEgresos, totalIngresos, totalMovimientos, presupuestoMap, fechaHasta };
+  return { ciclo, rows, totalEgresos, totalIngresos, totalEgresosArs, totalIngresosArs, totalMovimientos, presupuestoMap, fechaHasta, unidad: "kg" };
 }
 
 function getInformeMensual(anio, mes) {
   const periodo = `${anio}-${String(mes).padStart(2, '0')}`;
   const rows = db.prepare(`
-    SELECT concepto, 
-           SUM(egreso) as total_egreso, 
-           SUM(ingreso) as total_ingreso,
+    SELECT concepto,
+           SUM(egreso_kg) as total_egreso,
+           SUM(ingreso_kg) as total_ingreso,
+           SUM(egreso)     as total_egreso_ars,
+           SUM(ingreso)    as total_ingreso_ars,
            COUNT(*) as cant
-    FROM transacciones WHERE fecha LIKE ?
+    FROM transacciones WHERE fecha LIKE ? AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total_egreso DESC
   `).all(`${periodo}-%`);
 
@@ -2047,15 +2062,12 @@ const DB_SCHEMA = `Base SQLite de VIDELA (Cabaña Amakaik, Argentina). Montos du
 - cuentas_corrientes(id, proveedor, notas) — solo el nombre y las notas, NO tiene saldo.
 - cc_movimientos(id, fecha, proveedor, monto, medio, notas) — LOS PAGOS a proveedores de cuenta corriente. Son movimientos internos: NO están en transacciones y NO afectan el flujo de caja.
   ATENCIÓN: los pagos a un proveedor NUNCA están en transacciones.ingreso. Están acá.
-  Compras de un proveedor = SUM(egreso) FROM transacciones WHERE LOWER(proveedor)=LOWER(?) AND concepto != 'PAGO CUENTA CORRIENTE'
+  Compras de un proveedor = SUM(egreso_kg) FROM transacciones WHERE LOWER(proveedor)=LOWER(?) AND concepto != 'PAGO CUENTA CORRIENTE'
   Pagos de un proveedor    = SUM(monto)  FROM cc_movimientos WHERE LOWER(proveedor)=LOWER(?)
   Saldo (deuda)            = compras - pagos
   Si al calcular la deuda de un proveedor te da que no hay pagos, casi seguro estás mirando transacciones en vez de cc_movimientos.
-- cheques(id, fecha_emision, fecha_cobro [=vencimiento], tipo 'EMITIDO'/'RECIBIDO', proveedor, monto, estado, banco, concepto, numero, es_electronico, librador, recibido_de, entregado_a, fecha_recepcion, fecha_endoso, fecha_acreditacion, kg_carne, concepto_cobro, concepto_pago, moneda, transaccion_cobro_id, transaccion_pago_id, cc_movimiento_id, motivo_rechazo, notas)
-  CARTERA DE CHEQUES DE TERCEROS: los recibidos tienen estado EN_CARTERA (o PENDIENTE, los viejos) mientras los tenemos en mano; después pasan a COBRADO (el banco los acreditó), ENDOSADO (se los dimos a un tercero) o RECHAZADO. Lo que está en cartera NO movió el flujo todavía.
-  Cheques en cartera = WHERE tipo='RECIBIDO' AND estado IN ('EN_CARTERA','PENDIENTE'). Vencidos sin cobrar = eso mismo AND fecha_cobro < date('now').
-  Un cheque ENDOSADO generó dos transacciones del mismo monto y fecha (transaccion_cobro_id y transaccion_pago_id): el cobro y el pago en el mismo acto, por eso no movió la caja.
-  Los kg_carne de una venta se reconocen cuando el cheque se cobra o se endosa, no cuando entra a cartera.
+- CARTERA DE CHEQUES DE TERCEROS: los recibidos tienen estado EN_CARTERA (o PENDIENTE, los viejos) mientras los tenemos en mano; después pasan a COBRADO, ENDOSADO o RECHAZADO. Lo que está en cartera NO movió el flujo. Un cheque ENDOSADO generó dos transacciones del mismo monto y fecha (el cobro y el pago en el mismo acto), por eso no movió la caja. Para anotar o mover un cheque de terceros usá las acciones recibir_cheque / cobrar_cheque / endosar_cheque, no escribas la tabla a mano.
+- cheques(id, fecha_emision, fecha_cobro, tipo 'EMITIDO'/'RECIBIDO', proveedor, monto, estado 'PENDIENTE'/'COBRADO', banco, concepto)
 - inversores(id, inversor, fecha_ingreso, capital, tasa, estado, notas)
 - dividendos(id, socio, monto, fecha, notas)
 - lotes(id, nombre, hectareas, ha_sembrables [=ha aprovechables que se siembran], notas)
@@ -2063,8 +2075,19 @@ const DB_SCHEMA = `Base SQLite de VIDELA (Cabaña Amakaik, Argentina). Montos du
 - orden_items(id, orden_id, tipo 'INSUMO'/'SERVICIO', etapa, producto_id, descripcion, dosis, cantidad, unidad, precio_unitario, total, ejecutado 0/1, cantidad_ejecutada, total_ejecutado)
 - stock_productos(id, nombre, categoria, unidad, cantidad [=stock actual], precio_unitario [=costo promedio])
 - stock_movimientos(id, producto_id, fecha, tipo 'ENTRADA'/'SALIDA'/'AJUSTE', cantidad, precio_unitario)
-- presupuestos(id, ciclo, concepto, monto_anual)
-- diario_campo(id, campo, fecha, tipo, mm, titulo, detalle). tipo puede ser LLUVIA, HELADA, GRANIZO, VIENTO, SECA, TRABAJO, PASTURA, SANIDAD, VISITA, PROBLEMA o ACONTECIMIENTO. Para ANOTAR un evento del campo usá la herramienta anotar_evento, no intentes escribir acá (consultar_datos es solo lectura). El registro pluviométrico del campo: las lluvias son las filas con tipo='LLUVIA' y los milímetros están en mm. Para acumulados usá SUM(mm) filtrando por fecha (ej: lo que va del mes = WHERE tipo='LLUVIA' AND substr(fecha,1,7)='2026-08').
+- presupuestos(id, ciclo, concepto, monto_anual). monto_anual está en KG DE CARNE, no en pesos.
+
+GASTO OPERATIVO vs NO OPERATIVO: DIVIDENDOS, RETIRO SOCIOS y APORTE SOCIOS son
+distribución de resultado o capital: afectan la caja pero NO son gasto del negocio.
+Al informar gastos, costos o comparar contra el presupuesto, EXCLUÍLOS. En flujo de
+caja o saldo sí van incluidos.
+
+UNIDAD DEL SISTEMA: todo se informa en KG DE CARNE (índice novillo MAG), que no se
+licúa con la inflación. Cada movimiento tiene su par: ingreso/egreso en ARS e
+ingreso_kg/egreso_kg en kilos. Para totales, presupuestos, comparaciones entre
+períodos y cualquier análisis, usá SIEMPRE las columnas _kg. Mostrá los pesos
+sólo si te los piden expresamente o para un movimiento puntual reciente.
+- diario_campo(id, campo, fecha, tipo 'LLUVIA'/'ACONTECIMIENTO', mm, titulo, detalle). El registro pluviométrico del campo: las lluvias son las filas con tipo='LLUVIA' y los milímetros están en mm. Para acumulados usá SUM(mm) filtrando por fecha (ej: lo que va del mes = WHERE tipo='LLUVIA' AND substr(fecha,1,7)='2026-08').
 - tareas_campo(id, campo, texto, estado 'PENDIENTE'/'HECHA', fecha)
 Insumos faltantes de un año = por cada orden_items con tipo='INSUMO', ejecutado=0 y producto_id, sumar cantidad por producto y restar stock_productos.cantidad.`;
 
@@ -2106,9 +2129,9 @@ async function buildContexto() {
   // Resumen de egresos del mes actual
   const mesActual = new Date().toISOString().slice(0, 7);
   const egresosMes = db.prepare(`
-    SELECT concepto, SUM(egreso) as total 
-    FROM transacciones 
-    WHERE fecha LIKE ? AND egreso > 0
+    SELECT concepto, SUM(egreso_kg) as total, SUM(egreso) as total_ars
+    FROM transacciones
+    WHERE fecha LIKE ? AND egreso > 0 AND ${FILTRO_OPERATIVO}
     GROUP BY concepto ORDER BY total DESC LIMIT 10
   `).all(`${mesActual}-%`);
 
@@ -2116,11 +2139,13 @@ async function buildContexto() {
   const cicloAct = getCicloActual();
   const inf = cicloAct ? getInformeCiclo(cicloAct.ciclo) : null;
   const evol = db.prepare(`
-    SELECT substr(fecha,1,7) as mes, SUM(egreso) as egresos, SUM(ingreso) as ingresos, COUNT(*) as movs
+    SELECT substr(fecha,1,7) as mes,
+           SUM(egreso_kg) as egresos, SUM(ingreso_kg) as ingresos,
+           SUM(egreso) as egresos_ars, SUM(ingreso) as ingresos_ars, COUNT(*) as movs
     FROM transacciones GROUP BY mes ORDER BY mes DESC LIMIT 24
   `).all();
   // ── STOCK, LOTES, ÓRDENES (resumen liviano; el detalle lo consulta el bot con la herramienta) ──
-  const stock = db.prepare("SELECT nombre, categoria, unidad, cantidad, precio_unitario FROM stock_productos ORDER BY categoria, nombre").all();
+  const stock = db.prepare("SELECT nombre, categoria, unidad, cantidad, precio_unitario, ROUND(cantidad * COALESCE(precio_unitario,0), 2) AS valor_ars FROM stock_productos ORDER BY categoria, nombre").all();
   const lotes = db.prepare("SELECT nombre, hectareas, ha_sembrables FROM lotes ORDER BY nombre").all();
   const ordenesCtx = db.prepare("SELECT numero, anio, lote, titulo, estado, hectareas, total_planificado, total_ejecutado FROM ordenes_trabajo ORDER BY anio DESC, numero DESC").all()
     .map(o => ({ num: `${o.numero}/${o.anio}`, lote: o.lote, titulo: o.titulo, estado: o.estado, ha: o.hectareas, plan: Math.round(o.total_planificado || 0), ejec: Math.round(o.total_ejecutado || 0) }));
@@ -2135,22 +2160,6 @@ PRECIO MAG SEMANA ANTERIOR: ${precio ? `$${precio.toFixed(2)} ARS/kg carne (sema
 Cada monto en ARS se convierte automáticamente a kg carne usando el promedio MAG de la semana ANTERIOR a la fecha.
 
 CATEGORÍAS DE GASTO: ${CATEGORIAS.join(", ")}
-
-${(() => {
-  if (!eventos) return "";
-  try {
-    const ev = eventos.resumen(db, { campo: "AMAKAIK" });
-    const u = ev.lluvia.ultima;
-    return [
-      eventos.INSTRUCCIONES, "",
-      `LLUVIA EN AMAKAIK: ${ev.lluvia.mes} mm este mes (${ev.lluvia.dias_mes} día/s) · ${ev.lluvia.anio} mm en el año.`,
-      u ? `Última lluvia: ${u.mm} mm el ${u.fecha} (hace ${u.hace_dias} días).` : "Todavía no hay lluvias anotadas.",
-      ev.lluvia.alerta_seca ? `ATENCIÓN: ${ev.lluvia.alerta_seca}.` : "",
-      ev.por_mes.length ? `Por mes: ${ev.por_mes.map(m => m.mes + " " + m.mm + "mm").join(" · ")}` : "",
-      ev.ultimos.length ? `Últimos registros del diario: ${ev.ultimos.map(r => r.fecha + " " + r.tipo + (r.mm != null ? " " + r.mm + "mm" : "")).join(" · ")}` : ""
-    ].filter(Boolean).join("\n");
-  } catch (e) { return eventos.INSTRUCCIONES; }
-})()}
 
 HERRAMIENTAS — cuando sea una acción respondé SOLO con JSON exacto sin texto extra, sin markdown, sin bloques de código. NUNCA muestres el JSON al usuario — es solo para uso interno del sistema:
 {"accion":"registrar_transaccion","fecha":"YYYY-MM-DD","concepto":"CATEGORIA","detalle":"descripción","ingreso":0,"egreso":0,"proveedor":"nombre o vacío"}
@@ -2490,27 +2499,41 @@ function getStockValorizado(campo) {
   const productos = campo
     ? db.prepare("SELECT * FROM stock_productos WHERE campo = ? ORDER BY rubro, categoria, nombre").all(campo)
     : db.prepare("SELECT * FROM stock_productos ORDER BY rubro, categoria, nombre").all();
-  return productos.map(p => ({ ...p, rubro: p.rubro || 'AGRICOLA', valor: (p.cantidad || 0) * (p.precio_unitario || 0) }));
+  // Cada producto también valorizado en kg de carne al precio de hoy: así se
+  // ve cuánto vale el stock en la unidad del sistema, sin que la inflación lo
+  // infle. Si el producto guardó su precio en kg al comprarlo, se usa ese.
+  const mag = (getPrecioReferenciaSync(new Date().toISOString().slice(0, 10)) || {}).precio || 0;
+  return productos.map(p => {
+    const valor = (p.cantidad || 0) * (p.precio_unitario || 0);
+    const porKg = p.precio_unitario_kg != null && p.precio_unitario_kg > 0
+      ? (p.cantidad || 0) * p.precio_unitario_kg          // precio de la compra
+      : (mag > 0 ? valor / mag : 0);                      // al MAG de hoy
+    return {
+      ...p,
+      rubro: p.rubro || 'AGRICOLA',
+      valor,                                              // ARS
+      valor_kg: Math.round(porKg * 100) / 100,            // kg de carne
+      precio_unitario_kg_hoy: mag > 0 ? Math.round(((p.precio_unitario || 0) / mag) * 1000) / 1000 : 0
+    };
+  });
 }
 
 // ── EJECUTAR ACCIÓN ───────────────────────────────────────────────────────────
 async function ejecutarAccion(accion) {
-  const hoy = new Date().toISOString().split("T")[0];
-
   // Eventos del campo como acción, para que entren también desde RODEO.
   if (eventos && eventos.MANEJA && eventos.MANEJA.includes(accion.accion)) {
-    const r = eventos.ejecutarAccion(db, accion, { campo: "AMAKAIK" });
-    if (r != null) return r;
+    const _r = eventos.ejecutarAccion(db, accion, { campo: "AMAKAIK" });
+    if (_r != null) return _r;
   }
-
-  // Cheques de terceros. Devuelve null si la acción no es suya y sigue el resto.
-  // Acá la plata se lleva en kg de carne, así que va con el precio MAG de la
-  // semana: sin eso el módulo se niega a escribir en vez de dejar los kg en 0.
+  // Cheques de terceros. Acá la plata se lleva en kg de carne, así que van con
+  // el precio MAG de la semana: sin eso el módulo se niega a escribir en vez de
+  // dejar los kg en 0.
   if (cheques && cheques.MANEJA.includes(accion.accion)) {
-    const mag = await getPrecioReferencia(accion.fecha || accion.fecha_cobro || hoy);
-    const r = cheques.ejecutarAccion(db, accion, { moneda: "ARS", precio_mag: mag && mag.precio, semana_mag: mag && mag.semana });
-    if (r != null) return r;
+    const _mag = await getPrecioReferencia(accion.fecha || accion.fecha_cobro || new Date().toISOString().split("T")[0]);
+    const _r = cheques.ejecutarAccion(db, accion, { moneda: "ARS", precio_mag: _mag && _mag.precio, semana_mag: _mag && _mag.semana });
+    if (_r != null) return _r;
   }
+  const hoy = new Date().toISOString().split("T")[0];
 
   // REGISTRAR TRANSACCIÓN
   if (accion.accion === "registrar_transaccion") {
@@ -2759,7 +2782,8 @@ async function ejecutarAccion(accion) {
     // Detectar si piden un mes específico (ej: "marzo 2026" → fecha_desde en el JSON)
     const periodo = accion.periodo || new Date().toISOString().slice(0, 7);
     const rows = db.prepare(`
-      SELECT concepto, SUM(egreso) as total_egreso, SUM(ingreso) as total_ingreso
+      SELECT concepto, SUM(egreso_kg) as total_egreso, SUM(ingreso_kg) as total_ingreso,
+             SUM(egreso) as total_egreso_ars, SUM(ingreso) as total_ingreso_ars
       FROM transacciones WHERE fecha LIKE ?
       GROUP BY concepto ORDER BY total_egreso DESC
     `).all(`${periodo}-%`);
@@ -2782,7 +2806,8 @@ async function ejecutarAccion(accion) {
     if (!fecha_desde || !fecha_hasta) return "❌ Necesito fecha_desde y fecha_hasta.";
 
     const rows = db.prepare(`
-      SELECT concepto, SUM(egreso) as total_egreso, SUM(ingreso) as total_ingreso
+      SELECT concepto, SUM(egreso_kg) as total_egreso, SUM(ingreso_kg) as total_ingreso,
+             SUM(egreso) as total_egreso_ars, SUM(ingreso) as total_ingreso_ars
       FROM transacciones WHERE fecha BETWEEN ? AND ?
       GROUP BY concepto ORDER BY total_egreso DESC
     `).all(fecha_desde, fecha_hasta);
@@ -3391,7 +3416,7 @@ Respondé *SI* para confirmar o corregí lo que necesites.`;
       model: "claude-sonnet-4-6",
       max_tokens: 1500,
       system: contexto,
-      tools: eventos ? [DASHBOARD_TOOL, eventos.TOOL] : [DASHBOARD_TOOL],
+      tools: [DASHBOARD_TOOL],
       messages: mensajes,
     });
 
@@ -3400,10 +3425,7 @@ Respondé *SI* para confirmar o corregí lo que necesites.`;
       const toolResults = [];
       for (const bloque of result.content) {
         if (bloque.type === "tool_use") {
-          const salida =
-            bloque.name === "consultar_datos" ? consultarDB(bloque.input) :
-            (bloque.name === "anotar_evento" && eventos) ? eventos.ejecutarTool(db, bloque.input, { campo: "AMAKAIK" }) :
-            JSON.stringify({ error: "herramienta desconocida" });
+          const salida = bloque.name === "consultar_datos" ? consultarDB(bloque.input) : JSON.stringify({ error: "herramienta desconocida" });
           toolResults.push({ type: "tool_result", tool_use_id: bloque.id, content: salida });
         }
       }
@@ -3486,10 +3508,8 @@ Respondé *SI* para confirmar o corregí lo que necesites.`;
 
 // Ejecutar una acción ya parseada (usado por el chat de la app web)
 // ── LECTURA LIBRE, PARA EL BOT DE RODEO ──────────────────────────────────────
-// El bot de acá tiene consultar_datos: SQL abierto de sólo lectura sobre esta
-// base. RODEO tenía un menú fijo de cinco consultas y quedaba adivinando. Esta
-// es la misma puerta, abierta hacia afuera: sin sql devuelve el esquema y las
-// categorías, con sql corre el SELECT. Las guardas son las de consultarDB.
+// La misma puerta que consultar_datos, abierta hacia afuera: sin sql devuelve el
+// esquema y las categorías, con sql corre el SELECT. Guardas las de consultarDB.
 app.post("/api/consultar", (req, res) => {
   try {
     const sql = req.body && (req.body.sql || (req.body.accion && req.body.accion.sql));
@@ -4507,14 +4527,14 @@ app.get("/api/proyeccion", (req, res) => {
   const meses = parseInt(req.query.meses) || 12;
   // Caja inicial: saldo real desde el ciclo 25/26
   const desde = parseCiclo('25/26', 'productivo').fecha_desde;
-  const c = db.prepare("SELECT COALESCE(SUM(ingreso),0) ing, COALESCE(SUM(egreso),0) egr FROM transacciones WHERE fecha >= ?").get(desde);
+  const c = db.prepare("SELECT COALESCE(SUM(ingreso_kg),0) ing, COALESCE(SUM(egreso_kg),0) egr FROM transacciones WHERE fecha >= ?").get(desde);
   let saldo = Math.round((c.ing - c.egr) * 100) / 100;
 
   // Perfil de gasto POR MES del ciclo 25/26 (no un promedio plano): cada mes calendario
   // usa lo que realmente se gastó ese mes (alquiler, siembra, etc. quedan reflejados).
   const cicloDesde = parseCiclo('25/26', 'productivo').fecha_desde;   // 2025-03-01
   const cicloHasta = parseCiclo('25/26', 'productivo').fecha_hasta;   // 2026-02-28
-  const perfilRows = db.prepare(`SELECT substr(fecha,1,7) mes, COALESCE(SUM(egreso),0) t FROM transacciones
+  const perfilRows = db.prepare(`SELECT substr(fecha,1,7) mes, COALESCE(SUM(egreso_kg),0) t FROM transacciones
     WHERE fecha >= ? AND fecha <= ? AND egreso > 0 AND fuente NOT IN ('amortizacion','inversor') GROUP BY mes`).all(cicloDesde, cicloHasta);
   const perfilMesCal = {};   // { '03': monto, '04': monto, ... }
   perfilRows.forEach(r => { const mm = r.mes.slice(5, 7); perfilMesCal[mm] = (perfilMesCal[mm] || 0) + r.t; });
@@ -4532,8 +4552,8 @@ app.get("/api/proyeccion", (req, res) => {
     const mmCal = mes.slice(5, 7);
     const like = `${mes}-%`;
     // Cheques emitidos (a pagar) y recibidos (a cobrar) que vencen ese mes
-    const chE = db.prepare("SELECT COALESCE(SUM(monto),0) m FROM cheques WHERE estado='PENDIENTE' AND tipo='EMITIDO' AND fecha_cobro LIKE ?").get(like).m;
-    const chR = db.prepare("SELECT COALESCE(SUM(monto),0) m FROM cheques WHERE estado='PENDIENTE' AND tipo='RECIBIDO' AND fecha_cobro LIKE ?").get(like).m;
+    const chE = db.prepare("SELECT COALESCE(SUM(monto_kg),0) m FROM cheques WHERE estado='PENDIENTE' AND tipo='EMITIDO' AND fecha_cobro LIKE ?").get(like).m;
+    const chR = db.prepare("SELECT COALESCE(SUM(monto_kg),0) m FROM cheques WHERE estado='PENDIENTE' AND tipo='RECIBIDO' AND fecha_cobro LIKE ?").get(like).m;
     const invs = db.prepare("SELECT * FROM inversores WHERE estado='ACTIVO' AND fecha_vencimiento LIKE ?").all(like);
     const invVenc = Math.round(invs.reduce((s, inv) => s + calcularDeudaInversor(inv), 0) * 100) / 100;
 
@@ -4793,37 +4813,85 @@ function getIGU() {
 
 // ── PATRIMONIO: caja + fondo reposición + ganado + bienes + stock ─────────────
 function getPatrimonioActual() {
-  // Caja: saldo real acumulado, SOLO desde el ciclo 25/26 (lo anterior es histórico
-  // incompleto cargado por archivo, sin ingresos → distorsiona la caja).
-  const desde = parseCiclo('25/26', 'productivo').fecha_desde;   // 2025-03-01
-  const c = db.prepare("SELECT COALESCE(SUM(ingreso),0) ing, COALESCE(SUM(egreso),0) egr FROM transacciones WHERE fecha >= ?").get(desde);
+  // TODO EL PATRIMONIO EN KG DE CARNE. Los activos que ya están en kg (caja,
+  // ganado) se usan tal cual; los que están en pesos (bienes, stock, deudas) se
+  // dividen por el MAG de hoy. Mezclar unidades da un total sin sentido.
+  let mag = 0;
+  try { mag = (getPrecioReferenciaSync(new Date().toISOString().slice(0, 10)) || {}).precio || 0; } catch (e) {}
+  const num = v => Number.isFinite(+v) ? +v : 0;
+  const aKg = ars => mag > 0 ? Math.round((num(ars) / mag) * 100) / 100 : 0;
+
+  // Caja: saldo acumulado desde el ciclo 25/26, ya en kg movimiento a movimiento.
+  const desde = parseCiclo('25/26', 'productivo').fecha_desde;
+  // Los movimientos viejos pueden no tener su valor en kg calculado: en ese
+  // caso se convierte su importe en pesos al MAG de su propia fecha, que es lo
+  // correcto — no al de hoy, porque eso borraría el efecto de la inflación.
+  const c = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN ingreso_kg > 0 THEN ingreso_kg
+                        WHEN ingreso > 0 AND precio_mag > 0 THEN ingreso / precio_mag
+                        ELSE 0 END), 0) ing,
+      COALESCE(SUM(CASE WHEN egreso_kg > 0 THEN egreso_kg
+                        WHEN egreso > 0 AND precio_mag > 0 THEN egreso / precio_mag
+                        ELSE 0 END), 0) egr,
+      COALESCE(SUM(CASE WHEN ingreso > 0 AND ingreso_kg = 0 AND COALESCE(precio_mag,0) = 0 THEN 1
+                        WHEN egreso  > 0 AND egreso_kg  = 0 AND COALESCE(precio_mag,0) = 0 THEN 1
+                        ELSE 0 END), 0) sin_kg
+    FROM transacciones WHERE fecha >= ?`).get(desde);
   const caja = Math.round((c.ing - c.egr) * 100) / 100;
-  // Fondo de reposición: amortizaciones que salieron del flujo pero están resguardadas
-  const f = db.prepare("SELECT COALESCE(SUM(monto),0) f FROM amortizaciones").get();
-  const fondo = Math.round((f.f || 0) * 100) / 100;
-  // Ganado: plantel + venta (ambos son hacienda que vale). kg × IGU, o $/cabeza si no hay kg.
+  const movimientos_sin_kg = c.sin_kg || 0;
+
+  // Fondo de reposición: amortizaciones resguardadas.
+  const f = db.prepare("SELECT COALESCE(SUM(monto),0) fk FROM amortizaciones").get();
+  const fondo = Math.round(num(f.fk) * 100) / 100;
+
+  // Ganado: los kilos son directos, no hace falta convertir nada.
   const igu = getIGU().precio;
-  const ganado = Math.round(db.prepare("SELECT * FROM stock_ganadero").all().reduce((s, r) => {
+  const ganadoKg = db.prepare("SELECT * FROM stock_ganadero").all().reduce((s, r) => {
     const kg = r.kg_estimado || 0;
     const cabezas = (r.cantidad || 0) + (r.cantidad_venta || 0);
-    const v = (kg > 0 && igu > 0) ? cabezas * kg * igu : cabezas * (r.valor_cabeza || 0);
-    return s + v;
-  }, 0) * 100) / 100;
-  // Bienes: valor actual (depreciado)
-  const bienes = Math.round(db.prepare("SELECT * FROM bienes_muebles WHERE activo = 1").all().map(calcBien).reduce((s, b) => s + (b.valor_actual || 0), 0) * 100) / 100;
-  // Stock de insumos: valorizado
-  const stock = Math.round(getStockValorizado().reduce((s, p) => s + (p.valor || 0), 0) * 100) / 100;
+    // Con kg por cabeza son kilos de verdad; si sólo hay $/cabeza, se convierte.
+    return s + (kg > 0 ? cabezas * kg : aKg(cabezas * (r.valor_cabeza || 0)));
+  }, 0);
+  const ganado = Math.round(ganadoKg * 100) / 100;
 
-  // ── PASIVOS (lo que debemos) ──
-  const chP = db.prepare("SELECT COALESCE(SUM(monto),0) m FROM cheques WHERE estado='PENDIENTE' AND tipo='EMITIDO'").get();
-  const deuda_cheques = Math.round((chP.m || 0) * 100) / 100;
-  const deuda_cc = Math.round(getResumenCuentasCorrientes().reduce((s, c) => s + Math.max(parseFloat(c.saldo) || 0, 0), 0) * 100) / 100;
-  const deuda_inversores = Math.round(getInversoresActivos().reduce((s, i) => s + calcularDeudaInversor(i), 0) * 100) / 100;
+  // Bienes y stock están en pesos: se pasan a kg al precio de hoy.
+  const bienesArs = db.prepare("SELECT * FROM bienes_muebles WHERE activo = 1").all()
+    .map(calcBien).reduce((s, b) => s + (b.valor_actual || 0), 0);
+  const bienes = aKg(bienesArs);
+  const stockArs = getStockValorizado().reduce((s, p) => s + (p.valor || 0), 0);
+  const stock = aKg(stockArs);
 
-  const activos = Math.round((caja + fondo + ganado + bienes + stock) * 100) / 100;
-  const pasivos = Math.round((deuda_cheques + deuda_cc + deuda_inversores) * 100) / 100;
-  const total = Math.round((activos - pasivos) * 100) / 100;
-  return { caja, fondo, ganado, bienes, stock, deuda_cheques, deuda_cc, deuda_inversores, activos, pasivos, total };
+  // ── PASIVOS ──
+  const chP = db.prepare("SELECT COALESCE(SUM(monto_kg),0) mk, COALESCE(SUM(monto),0) ma FROM cheques WHERE estado='PENDIENTE' AND tipo='EMITIDO'").get();
+  const deuda_cheques = Math.round(((chP.mk || 0) || aKg(chP.ma || 0)) * 100) / 100;
+  const deudaCcArs = getResumenCuentasCorrientes().reduce((s, c) => s + Math.max(parseFloat(c.saldo) || 0, 0), 0);
+  const deuda_cc = aKg(deudaCcArs);
+  const deudaInvArs = getInversoresActivos().reduce((s, i) => s + calcularDeudaInversor(i), 0);
+  const deuda_inversores = aKg(deudaInvArs);
+
+  const activos = Math.round(num(caja + fondo + ganado + bienes + stock) * 100) / 100;
+  const pasivos = Math.round(num(deuda_cheques + deuda_cc + deuda_inversores) * 100) / 100;
+  const total = Math.round(num(activos - pasivos) * 100) / 100;
+
+  return {
+    caja: num(caja), fondo: num(fondo), ganado: num(ganado),
+    bienes: num(bienes), stock: num(stock),
+    deuda_cheques: num(deuda_cheques), deuda_cc: num(deuda_cc),
+    deuda_inversores: num(deuda_inversores),
+    activos, pasivos, total,
+    unidad: "kg", precio_mag: mag,
+    // Si hay movimientos sin precio MAG no se pueden convertir: se avisa en vez
+    // de mostrar un total que da por hecho que están todos.
+    movimientos_sin_kg,
+    // Referencia en pesos de hoy, para cuando haga falta el número del banco.
+    ars: {
+      total: Math.round(total * mag * 100) / 100,
+      stock: Math.round(stockArs * 100) / 100,
+      bienes: Math.round(bienesArs * 100) / 100,
+      deuda_cc: Math.round(deudaCcArs * 100) / 100
+    }
+  };
 }
 
 app.get("/api/patrimonio", (req, res) => {
@@ -4915,15 +4983,55 @@ app.delete("/api/ganado/:id", (req, res) => {
 
 // Sincronizar cantidades del rodeo desde Angus del Este (server → server)
 app.post("/api/ganado/sync-ade", async (req, res) => {
-  const campoAde = req.body.campo_ade || 'angus_del_este';
+  // Cada campo del financiero tiene su par en el sistema ganadero.
+  const PAR_GANADERO = {
+    'AMAKAIK':      'angus_la_posta',
+    'CAMPO VIDELA': 'angus_la_posta',
+    'EL TRIUNFO':   'el_triunfo',
+    'LA GUAGUA':    'la_guagua'
+  };
+  // La empresa tiene hacienda repartida en varios campos: para valuar el
+  // patrimonio hay que sumarlos todos, no mirar uno solo.
+  const CAMPOS_EMPRESA = ['angus_la_posta', 'el_triunfo', 'la_guagua'];
+  const campoFin = String(req.body.campo || req.query.campo || '').toUpperCase().trim();
+  const pedidos = req.body.campos_ade
+    || (req.body.campo_ade ? [req.body.campo_ade]
+        : (PAR_GANADERO[campoFin] && campoFin !== 'AMAKAIK' && campoFin !== 'CAMPO VIDELA')
+          ? [PAR_GANADERO[campoFin]]
+          : CAMPOS_EMPRESA);
+
   try {
-    const resp = await fetch(`${ADE_URL}/api/rodeo-resumen?campo=${encodeURIComponent(campoAde)}`);
-    if (!resp.ok) return res.status(502).json({ error: `ADE respondió ${resp.status}. Verificá que el endpoint /api/rodeo-resumen exista y sea público.` });
-    const data = await resp.json();
-    // Tolerante al formato: array directo o envuelto en rodeo/categorias/data
-    const lista = Array.isArray(data) ? data : (data.rodeo || data.categorias || data.data || []);
-    if (!Array.isArray(lista) || !lista.length) {
-      return res.json({ ok: true, actualizados: 0, creados: 0, mensaje: 'ADE no devolvió categorías', crudo: data });
+    // Se suman las categorías de todos los campos: una vaca PP en El Triunfo y
+    // otra en La Guagua son dos vacas PP del mismo rodeo.
+    const acum = new Map();
+    const traidos = [], fallados = [];
+    for (const c of pedidos) {
+      let data;
+      try {
+        const r = await fetch(`${ADE_URL}/api/rodeo-resumen?campo=${encodeURIComponent(c)}`);
+        if (!r.ok) { fallados.push(`${c} (HTTP ${r.status})`); continue; }
+        data = await r.json();
+      } catch (e) { fallados.push(`${c} (${String(e.message).slice(0,40)})`); continue; }
+
+      const l = Array.isArray(data) ? data : (data.rodeo || data.categorias || data.data || []);
+      if (!Array.isArray(l) || !l.length) continue;
+      traidos.push(c);
+      for (const it of l) {
+        const cat = it.categoria || it.category || it.nombre || it.cat;
+        const reg = (it.registro || it.pedigree || 'GENERAL').toUpperCase();
+        if (!cat) continue;
+        const k = `${String(cat).toUpperCase()}|${reg}`;
+        if (!acum.has(k)) acum.set(k, { categoria: cat, registro: reg, plantel: 0, venta: 0 });
+        const a = acum.get(k);
+        a.plantel += parseFloat(it.plantel ?? it.cantidad ?? it.count ?? 0) || 0;
+        a.venta   += parseFloat(it.venta ?? it.cantidad_venta ?? 0) || 0;
+      }
+    }
+    const lista = [...acum.values()];
+    if (!lista.length) {
+      return res.json({ ok: true, actualizados: 0, creados: 0,
+        mensaje: fallados.length ? `No pude leer: ${fallados.join(', ')}` : 'ADE no devolvió categorías',
+        campos_consultados: pedidos, campos_con_datos: traidos });
     }
     const getByCatReg = db.prepare("SELECT * FROM stock_ganadero WHERE LOWER(categoria) = LOWER(?) AND LOWER(COALESCE(registro,'GENERAL')) = LOWER(?)");
     const upd = db.prepare("UPDATE stock_ganadero SET cantidad = ?, cantidad_venta = ?, origen = 'ade', updated_at = datetime('now') WHERE id = ?");
@@ -4940,7 +5048,10 @@ app.post("/api/ganado/sync-ade", async (req, res) => {
       if (ex) { upd.run(plantel, venta, ex.id); actualizados++; }
       else { ins.run(cat, reg, plantel, venta); creados++; }
     }
-    res.json({ ok: true, actualizados, creados, total_cabezas: totalCab, categorias: lista.length });
+    res.json({ ok: true, actualizados, creados, total_cabezas: totalCab, categorias: lista.length,
+      campos: traidos, campos_sin_datos: fallados,
+      mensaje: `${totalCab} cabezas sumando ${traidos.length} campo${traidos.length>1?'s':''}` +
+        (fallados.length ? ` · no pude leer: ${fallados.join(', ')}` : '') });
   } catch (e) {
     res.status(502).json({ error: 'No pude conectar con ADE: ' + String(e.message).slice(0, 150) });
   }
