@@ -427,6 +427,119 @@ function rechazar(db, ref, datos = {}, ctx = {}) {
   };
 }
 
+// ── 5. ME EQUIVOQUÉ: VOLVER ATRÁS ────────────────────────────────────────────
+// Distinto de rechazar. Rechazar es un hecho: el cheque rebotó, y queda
+// anotado. Esto es deshacer una carga mal hecha: el cheque vuelve a cartera
+// como si nunca se hubiera movido, y se borra todo lo que había generado.
+function deshacer(db, ref, datos = {}, ctx = {}) {
+  const c = ctxDe(ctx);
+  const { cheque, error } = encontrarUno(db, ref);
+  if (error) return { ok: false, error };
+  if (["EN_CARTERA", "PENDIENTE"].includes(cheque.estado)) {
+    return { ok: false, error: `El cheque #${cheque.id} ya está en cartera: no hay nada que deshacer.` };
+  }
+
+  const estaba = ESTADOS[cheque.estado] || cheque.estado;
+  const borrado = [];
+  for (const [campo, etiqueta] of [["transaccion_cobro_id", "el cobro"], ["transaccion_pago_id", "el pago"]]) {
+    if (cheque[campo]) {
+      try {
+        if (db.prepare("DELETE FROM transacciones WHERE id=?").run(cheque[campo]).changes) borrado.push(etiqueta);
+      } catch (e) {}
+    }
+  }
+  if (cheque.cc_movimiento_id) {
+    try {
+      if (db.prepare("DELETE FROM cc_movimientos WHERE id=?").run(cheque.cc_movimiento_id).changes)
+        borrado.push(`el descuento de la cuenta de ${cheque.entregado_a || "el proveedor"}`);
+    } catch (e) {}
+  }
+
+  db.prepare(`UPDATE cheques SET estado='EN_CARTERA', entregado_a=NULL, fecha_endoso=NULL,
+    fecha_acreditacion=NULL, concepto_pago=NULL, motivo_rechazo=NULL,
+    transaccion_cobro_id=NULL, transaccion_pago_id=NULL, cc_movimiento_id=NULL
+    WHERE id=?`).run(cheque.id);
+
+  return {
+    ok: true, id: cheque.id, estaba, borrado,
+    mensaje: [
+      `↩️ Cheque #${cheque.id} de vuelta en cartera (estaba ${estaba}).`,
+      `${fmt(cheque.monto)} ${c.moneda}${cheque.numero ? ` · ${cheque.numero}` : ""}${cheque.recibido_de ? ` · de ${cheque.recibido_de}` : ""}`,
+      borrado.length ? `Di de baja ${borrado.length > 1 ? borrado.slice(0, -1).join(", ") + " y " + borrado[borrado.length - 1] : borrado[0]}.`
+                     : "No había movimientos que dar de baja.",
+      cheque.entregado_a ? `La deuda con ${cheque.entregado_a} volvió a quedar abierta.` : null
+    ].filter(Boolean).join("\n")
+  };
+}
+
+/** Corregir los datos de un cheque. */
+function editar(db, ref, datos = {}, ctx = {}) {
+  const c = ctxDe(ctx);
+  const { cheque, error } = encontrarUno(db, ref);
+  if (error) return { ok: false, error };
+
+  // Si ya se movió, sus movimientos quedaron con el monto y la fecha de
+  // entonces. Cambiarlos acá los dejaría mintiendo.
+  if (!["EN_CARTERA", "PENDIENTE"].includes(cheque.estado)) {
+    return { ok: false, error:
+      `El cheque #${cheque.id} está ${ESTADOS[cheque.estado] || cheque.estado} y ya generó movimientos. ` +
+      `Deshacelo primero y después editalo, si no los asientos quedan con los datos viejos.` };
+  }
+
+  const campos = {
+    monto: "monto", numero: "numero", banco: "banco", librador: "librador",
+    recibido_de: "recibido_de", fecha_cobro: "fecha_cobro", vencimiento: "fecha_cobro",
+    fecha_emision: "fecha_emision", kg_carne: "kg_carne", concepto_cobro: "concepto_cobro",
+    notas: "notas", es_electronico: "es_electronico"
+  };
+  const sets = [], params = [], contados = [];
+  for (const [entra, col] of Object.entries(campos)) {
+    if (datos[entra] === undefined || sets.some(x => x.startsWith(col + "="))) continue;
+    let v = datos[entra];
+    if (col === "monto" || col === "kg_carne") { v = num(v); if (col === "monto" && !(v > 0)) return { ok: false, error: "El monto tiene que ser mayor a cero." }; }
+    if (col === "es_electronico") v = v ? 1 : 0;
+    sets.push(`${col}=?`); params.push(v); contados.push(`${col} → ${v}`);
+  }
+  if (!sets.length) return { ok: false, error: "No me dijiste qué cambiar. Podés cambiar monto, numero, banco, librador, recibido_de, fecha_cobro, kg_carne o notas." };
+
+  // El monto nuevo arrastra los kg, donde el sistema los lleva.
+  if (sets.some(x => x.startsWith("monto=")) && c.precio_mag && tieneCol(db, "cheques", "monto_kg")) {
+    const nuevo = params[sets.findIndex(x => x.startsWith("monto="))];
+    sets.push("monto_kg=?", "precio_mag=?"); params.push(nuevo / c.precio_mag, c.precio_mag);
+  }
+
+  db.prepare(`UPDATE cheques SET ${sets.join(", ")} WHERE id=?`).run(...params, cheque.id);
+  const ahora = db.prepare("SELECT * FROM cheques WHERE id=?").get(cheque.id);
+  return {
+    ok: true, id: cheque.id, cambios: contados,
+    mensaje: [
+      `✏️ Cheque #${cheque.id} corregido.`,
+      `${ahora.numero ? ahora.numero + " · " : ""}${fmt(ahora.monto)} ${c.moneda}${enKg(ahora.monto, c.precio_mag)}${ahora.recibido_de ? ` · de ${ahora.recibido_de}` : ""}${ahora.fecha_cobro ? ` · vence ${ahora.fecha_cobro}` : ""}`
+    ].join("\n")
+  };
+}
+
+/** Borrarlo del todo: se cargó por error y no existía. */
+function borrarCheque(db, ref, datos = {}, ctx = {}) {
+  const c = ctxDe(ctx);
+  const { cheque, error } = encontrarUno(db, ref);
+  if (error) return { ok: false, error };
+
+  const movido = !["EN_CARTERA", "PENDIENTE"].includes(cheque.estado);
+  if (movido && !datos.forzar) {
+    return { ok: false, error:
+      `El cheque #${cheque.id} está ${ESTADOS[cheque.estado] || cheque.estado}: ya generó movimientos. ` +
+      `Si de verdad querés borrarlo con todo lo que generó, decímelo de nuevo y lo hago; si sólo te equivocaste al moverlo, mejor deshacelo.` };
+  }
+  for (const campo of ["transaccion_cobro_id", "transaccion_pago_id"]) {
+    if (cheque[campo]) { try { db.prepare("DELETE FROM transacciones WHERE id=?").run(cheque[campo]); } catch (e) {} }
+  }
+  if (cheque.cc_movimiento_id) { try { db.prepare("DELETE FROM cc_movimientos WHERE id=?").run(cheque.cc_movimiento_id); } catch (e) {} }
+  db.prepare("DELETE FROM cheques WHERE id=?").run(cheque.id);
+  return { ok: true, id: cheque.id,
+    mensaje: `🗑️ Borré el cheque #${cheque.id}${cheque.numero ? ` (${cheque.numero})` : ""} de ${fmt(cheque.monto)} ${c.moneda}${movido ? ", con los movimientos que había generado" : ""}.` };
+}
+
 // ── Lo que tenemos en mano ───────────────────────────────────────────────────
 function cartera(db, opciones = {}) {
   const hoy = opciones.hoy || hoyISO();
@@ -516,6 +629,18 @@ function ejecutarAccion(db, accion = {}, ctx = {}) {
         const r = rechazar(db, ref, accion, ctx);
         return r.ok ? r.mensaje : `❌ ${r.error}`;
       }
+      case "deshacer_cheque": {
+        const r = deshacer(db, ref, accion, ctx);
+        return r.ok ? r.mensaje : `❌ ${r.error}`;
+      }
+      case "editar_cheque": {
+        const r = editar(db, ref, accion, ctx);
+        return r.ok ? r.mensaje : `❌ ${r.error}`;
+      }
+      case "borrar_cheque": {
+        const r = borrarCheque(db, ref, accion, ctx);
+        return r.ok ? r.mensaje : `❌ ${r.error}`;
+      }
       case "ver_cartera":
         return textoCartera(db, { ...ctx, ...accion });
       case "buscar_cheque": {
@@ -536,7 +661,8 @@ function ejecutarAccion(db, accion = {}, ctx = {}) {
   }
 }
 
-const MANEJA = ["recibir_cheque", "cobrar_cheque", "endosar_cheque", "rechazar_cheque", "ver_cartera", "buscar_cheque"];
+const MANEJA = ["recibir_cheque", "cobrar_cheque", "endosar_cheque", "rechazar_cheque",
+  "deshacer_cheque", "editar_cheque", "borrar_cheque", "ver_cartera", "buscar_cheque"];
 
 // Lo que se le dice al bot para que las use.
 const ACCIONES = `CHEQUES DE TERCEROS — un cheque es un instrumento de cobro que circula, no un movimiento. Mientras está en cartera NO mueve el flujo.
@@ -549,7 +675,13 @@ const ACCIONES = `CHEQUES DE TERCEROS — un cheque es un instrumento de cobro q
 // Se lo dimos a un tercero. Es cobrarlo y pagarlo en el mismo acto: se registran las DOS patas (ingreso + egreso) con la misma fecha y monto, así que la caja no se mueve y las dos cosas cuentan en el resultado.
 // Si el que recibe el cheque tiene cuenta corriente, se detecta solo: el egreso va como PAGO CUENTA CORRIENTE (el gasto ya se registró con la compra) y se le descuenta la deuda.
 {"accion":"rechazar_cheque","cheque":"id o número","motivo":"sin fondos"}
-// Rebotó. Da de baja el ingreso y el pago que había generado; quien lo dio vuelve a deber.
+// Rebotó DE VERDAD, en el banco. Queda anotado como rechazado y quien lo dio vuelve a deber. No la uses para corregir una carga mal hecha.
+{"accion":"deshacer_cheque","cheque":"id o número"}
+// ME EQUIVOQUÉ: vuelve el cheque a cartera como si nunca se hubiera movido, y da de baja el cobro, el pago y el descuento de cuenta corriente que había generado. Es lo que se usa cuando lo cobraste o endosaste por error, o se lo adjudicaste a quien no era. Sirve también para sacar un cheque de rechazado.
+{"accion":"editar_cheque","cheque":"id o número","monto":0,"numero":"","recibido_de":"","fecha_cobro":"YYYY-MM-DD","banco":"","librador":"","kg_carne":0,"notas":""}
+// Corrige los datos. Mandá sólo los campos que cambian. Si el cheque ya se movió hay que deshacerlo primero: si no, los asientos que generó quedarían con el monto viejo.
+{"accion":"borrar_cheque","cheque":"id o número","forzar":true}
+// El cheque no existía, se cargó por error. Si ya se había movido pide confirmación antes de borrarlo con todo lo que generó. Si sólo te equivocaste al moverlo, deshacé en vez de borrar.
 {"accion":"ver_cartera"}
 // Qué cheques tenemos en mano, qué vence y qué está vencido sin cobrar.
 {"accion":"buscar_cheque","texto":"número, persona o monto"}
@@ -564,6 +696,7 @@ Los kg de carne de una venta se reconocen cuando el cheque se cobra o se endosa,
 Si no sabés qué cheque es, buscalo con buscar_cheque o ver_cartera antes de preguntar.`;
 
 module.exports = {
-  init, recibir, cobrar, endosar, rechazar, cartera, resumen, buscar, encontrarUno,
+  init, recibir, cobrar, endosar, rechazar, deshacer, editar, borrarCheque,
+  cartera, resumen, buscar, encontrarUno,
   textoCartera, ejecutarAccion, MANEJA, ACCIONES, INSTRUCCIONES, ESTADOS
 };
